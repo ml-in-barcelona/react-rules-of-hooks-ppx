@@ -49,11 +49,8 @@ jobs:
       - name: Build
         run: esy build
 
-      - name: Run Native tests
-        run: esy test_native
-
-      - name: Run Native snapshot tests
-        run: esy test_snapshot
+      - name: Run tests
+        run: esy test
 
       - name: Export dependencies
         run: esy export-dependencies
