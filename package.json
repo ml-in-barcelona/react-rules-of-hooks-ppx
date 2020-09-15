@@ -1,0 +1,47 @@
+{
+  "name": "react-rules-of-hooks-ppx",
+  "version": "0.1.0",
+  "description": "",
+  "author": "David Sancho <dsnxmoreno@gmail.com>",
+  "keywords": [
+    "reason",
+    "ocaml",
+    "ppx",
+    "bucklescript",
+    "rescript",
+    "react",
+    "hooks"
+  ],
+  "esy": {
+    "build": "dune build -p ReactRulesOfHooksPpx",
+    "buildEnv": {
+      "ODOC_SYNTAX": "re"
+    },
+    "release": {
+      "bin": [
+        "Bin"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@opam/merlin": "*",
+    "ocaml": "4.10.0",
+    "@esy-ocaml/reason": "^3.5.2",
+    "@opam/dune": "*",
+    "@opam/ocaml-migrate-parsetree": "^1.7.3",
+    "@opam/ppxlib": "0.14.0",
+    "@reason-native/rely": "^3.2.1",
+    "@opam/ocaml-lsp-server": "ocaml/ocaml-lsp:ocaml-lsp-server.opam#fbc433e14035d520c7137916ae710b8ec3b415e9"
+  },
+  "resolutions": {
+    "@esy-ocaml/reason": "facebook/reason:reason.json#773dbcd"
+  },
+  "scripts": {
+    "test": "esy x Run.exe",
+    "doc": "esy dune build @doc",
+    "doc-path": "esy echo #{self.target_dir}/default/_doc/_html/index.html",
+    "format": "esy dune build @fmt --auto-promote",
+    "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
+    "utop": "esy dune utop lib -- -implicit-bindings"
+  }
+}

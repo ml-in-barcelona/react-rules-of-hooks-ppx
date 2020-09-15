@@ -1,0 +1,16 @@
+(library
+ (name ReactRulesOfHooksPpxTest)
+ (ocamlopt_flags -linkall -g)
+ (libraries ReactRulesOfHooksPpx.lib rely.lib)
+ (modules
+  (:standard \ Run)
+ )
+)
+
+(executable
+ (package ReactRulesOfHooksPpx)
+ (name Run)
+ (public_name Run.exe)
+ (libraries ReactRulesOfHooksPpxTest)
+ (modules Run)
+)

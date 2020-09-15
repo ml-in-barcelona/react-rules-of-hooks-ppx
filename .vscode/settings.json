@@ -1,0 +1,9 @@
+{
+  "[reason]": {
+    "editor.formatOnSave": true
+  },
+  "ocaml.sandbox": {
+    "kind": "esy",
+    "root": "/Users/davesnx/dev/reason-in-barcelona/react-rules-of-hooks-ppx"
+  },
+}
