@@ -13,7 +13,7 @@
     "hooks"
   ],
   "esy": {
-    "build": "dune build -p ReactRulesOfHooksPpx",
+    "build": "dune build",
     "buildsInSource": "_build",
     "buildEnv": {
       "ODOC_SYNTAX": "re"
@@ -27,8 +27,8 @@
   "devDependencies": {
     "@opam/merlin": "*",
     "ocaml": "4.10.0",
-    "@esy-ocaml/reason": "^3.5.2",
-    "@opam/dune": "*",
+    "@esy-ocaml/reason": ">= 3.6.0 < 4.0.0",
+    "@opam/dune": ">=2.6",
     "@opam/ocaml-migrate-parsetree": "^1.7.3",
     "@opam/ppxlib": "0.14.0",
     "@reason-native/rely": "^3.2.1",
@@ -38,11 +38,11 @@
     "@esy-ocaml/reason": "facebook/reason:reason.json#773dbcd"
   },
   "scripts": {
+    "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
     "test": "esy x Run.exe",
     "doc": "esy dune build @doc",
     "doc-path": "esy echo #{self.target_dir}/default/_doc/_html/index.html",
     "format": "esy dune build @fmt --auto-promote",
-    "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
     "utop": "esy dune utop lib -- -implicit-bindings"
   }
 }
