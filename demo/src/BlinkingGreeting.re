@@ -1,6 +1,6 @@
 [@react.component]
 let make = (~randomProp: string) => {
-  let (show, setShow) = React.useState(() => "sTaTe");
+  let (show, setShow) = React.useState(() => "sTatE");
 
   React.useEffect1(
     () => {

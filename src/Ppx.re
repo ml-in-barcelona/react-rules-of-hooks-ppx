@@ -1,40 +1,27 @@
-open Migrate_parsetree;
-open Ast_410;
-open Ast_mapper;
-open Parsetree;
+open Ppxlib;
 
-exception MissingDependencyOnEffectArray(string);
+/* Merlin_helpers.hide_expression */
 
-let rulesOfHooksMapper = (_, _) => {
-  ...default_mapper,
-  expr: (mapper, expr) =>
-    switch (expr.pexp_desc) {
-    /* Map to every function call with the name
-         - React.useEffect
-         - React.useLayoutEffect
-         - useEffect
-         - useLayoutEffect
-       */
-    | Pexp_ident({loc: _, txt: Ldot(Lident("React"), useEffect)}) =>
-      failwith("React." ++ useEffect)
-    | Pexp_apply(
-        {
-          pexp_desc:
-            Pexp_ident({loc: _, txt: Ldot(Lident("React"), useEffect)}),
-          pexp_loc: _,
-          pexp_attributes: _,
-          pexp_loc_stack: _,
-        },
-        [_arguments],
-      ) =>
-      failwith("React. " ++ useEffect)
-    | _ => default_mapper.expr(mapper, expr)
-    },
-};
+let locatedRaise = (~loc, msg) => Location.raise_errorf(~loc, msg);
+
+let expand = (e: Parsetree.expression) =>
+  switch (e.pexp_desc) {
+  | Pexp_apply(
+      {
+        pexp_desc: Pexp_ident({loc, txt: _lident, _}),
+        pexp_loc: _pexp_loc,
+        pexp_attributes: _,
+        pexp_loc_stack: _,
+      },
+      _args,
+    ) =>
+    ignore(locatedRaise(~loc, "lident"));
+    None;
+  | _ => None
+  };
 
 let () =
-  Driver.register(
-    ~name="rules-of-hooks-ppx",
-    Versions.ocaml_410,
-    rulesOfHooksMapper,
+  Driver.register_transformation(
+    ~rules=[Context_free.Rule.special_function("useEffect1", expand)],
+    "react-rules-of-hooks",
   );

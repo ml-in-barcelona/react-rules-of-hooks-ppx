@@ -1,8 +1,11 @@
 {
-  "name": "reason-react-examples",
+  "name": "reason-react-example",
   "reason": {
     "react-jsx": 3
   },
+  "refmt": 3,
+  "suffix": ".bs.js",
+  "namespace": true,
   "sources": {
     "dir": "src",
     "subdirs": true
@@ -17,13 +20,10 @@
       "in-source": true
     }
   ],
-  "suffix": ".bs.js",
-  "namespace": true,
   "bs-dependencies": [
     "reason-react"
   ],
   "ppx-flags": [
     "../_build/default/bin/bin.exe"
-  ],
-  "refmt": 3
+  ]
 }

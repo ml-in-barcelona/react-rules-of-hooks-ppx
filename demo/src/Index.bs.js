@@ -2,7 +2,7 @@
 
 var React = require("react");
 var ReactDom = require("react-dom");
-var BlinkingGreeting$ReasonReactExamples = require("./BlinkingGreeting.bs.js");
+var BlinkingGreeting$ReasonReactExample = require("./BlinkingGreeting.bs.js");
 
 function makeContainer(text) {
   var container = document.createElement("div");
@@ -18,7 +18,7 @@ function makeContainer(text) {
   return content;
 }
 
-ReactDom.render(React.createElement(BlinkingGreeting$ReasonReactExamples.make, {
+ReactDom.render(React.createElement(BlinkingGreeting$ReasonReactExample.make, {
           randomProp: "3"
         }), makeContainer("Blinking Greeting"));
 

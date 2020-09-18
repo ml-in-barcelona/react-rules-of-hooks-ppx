@@ -6,7 +6,7 @@ var React = require("react");
 function BlinkingGreeting(Props) {
   var randomProp = Props.randomProp;
   var match = React.useState((function () {
-          return "sTaTe";
+          return "sTatE";
         }));
   var setShow = match[1];
   var show = match[0];

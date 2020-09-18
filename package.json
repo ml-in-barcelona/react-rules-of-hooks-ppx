@@ -13,8 +13,26 @@
     "hooks"
   ],
   "esy": {
-    "build": "dune build",
     "buildsInSource": "_build",
+    "build": [
+      [
+        "dune",
+        "build",
+        "-p",
+        "ReactRulesOfHooksPpx"
+      ]
+    ],
+    "buildDev": [
+      [
+        "dune",
+        "build",
+        "--promote-install-files",
+        "--root",
+        ".",
+        "--only-package",
+        "ReactRulesOfHooksPpx"
+      ]
+    ],
     "buildEnv": {
       "ODOC_SYNTAX": "re"
     },
@@ -28,7 +46,7 @@
     "@opam/merlin": "*",
     "ocaml": "4.10.0",
     "@esy-ocaml/reason": ">= 3.6.0 < 4.0.0",
-    "@opam/dune": ">=2.6",
+    "@opam/dune": "> 1.11.4",
     "@opam/ocaml-migrate-parsetree": "^1.7.3",
     "@opam/ppxlib": "0.14.0",
     "@reason-native/rely": "^3.2.1",
