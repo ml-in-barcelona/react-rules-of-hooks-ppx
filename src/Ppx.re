@@ -17,7 +17,9 @@ let expand = (e: Parsetree.expression) =>
     ) =>
     ignore(locatedRaise(~loc, "lident"));
     None;
-  | _ => None
+  | _ =>
+    ignore(locatedRaise(~loc=Location.none, "lident"));
+    None;
   };
 
 let () =

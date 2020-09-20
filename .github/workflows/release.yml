@@ -58,7 +58,7 @@ jobs:
       - name: Upload artifacts for ${{ matrix.os }}
         uses: actions/upload-artifact@master
         with:
-          name: ${{ matrix.os }}
+          name: ${{ matrix.os }}-artifact
           path: _build/default/bin/Bin.exe
 
   publish:
@@ -73,22 +73,28 @@ jobs:
         with:
           node-version: 12.x
 
+      - name: Fetch git tags
+        run: git fetch --tags --force
+
       - name: Make NPM release skeleton
         run: node scripts/release-make-skeleton.js
 
       - name: Download linux artifacts
+        if: success()
         uses: actions/download-artifact@master
         with:
-          name: ubuntu-latest
+          name: ubuntu-latest-artifact
           path: _release/platform-linux-x64
 
       - name: Download macOS artifacts
+        if: success()
         uses: actions/download-artifact@master
         with:
           name: macos-latest
           path: _release/platform-darwin-x64
 
       # - name: Download windows artifacts
+      # if: success()
       #   uses: actions/download-artifact@master
       #   with:
       #     name: windows-latest
