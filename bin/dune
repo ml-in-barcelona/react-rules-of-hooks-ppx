@@ -1,5 +1,5 @@
 (executable
-  (name bin)
+  (name Bin)
   (public_name rules-of-hooks)
   (libraries ReactRulesOfHooksPpx.lib)
   (ocamlopt_flags ( -linkall ))
