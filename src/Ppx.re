@@ -2,9 +2,9 @@ open Ppxlib;
 
 /* Merlin_helpers.hide_expression */
 
-let locatedRaise = (~loc, msg) => Location.raise_errorf(~loc, msg);
+let locatedRaise = (~loc, msg) => Location.raise_errorf(~loc, msg) |> ignore;
 
-let expand = (e: Parsetree.expression) =>
+let useEffect1Expand = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
   | Pexp_apply(
       {
@@ -15,15 +15,23 @@ let expand = (e: Parsetree.expression) =>
       },
       _args,
     ) =>
-    ignore(locatedRaise(~loc, "lident"));
+    locatedRaise(~loc, "lident");
     None;
-  | _ =>
-    ignore(locatedRaise(~loc=Location.none, "lident"));
-    None;
+  | _ => None
   };
 
 let () =
+  /* TODO: Instead of register_transformation, try register_correction
+     which suggest the corrected AST to the user. In the useEffect dependency
+     case, it should print the expression with the new dependency array. */
   Driver.register_transformation(
-    ~rules=[Context_free.Rule.special_function("useEffect1", expand)],
+    ~rules=[
+      /* TODO: Add all useEffects as rules */
+      Context_free.Rule.special_function(
+        "React.useEffect1",
+        useEffect1Expand,
+      ),
+      Context_free.Rule.special_function("useEffect1", useEffect1Expand),
+    ],
     "react-rules-of-hooks",
   );
