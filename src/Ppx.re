@@ -30,7 +30,7 @@ let getIdents = (expression: Parsetree.expression) => {
     | Pexp_tuple(exprs) =>
       List.concat_map(expr => getIdentsInner(expr, identifiers), exprs)
     | Pexp_construct(_, None) => identifiers
-    | Pexp_construct({txt: Lident("None")}, _) => identifiers
+    | Pexp_construct({txt: Lident("None"), _}, _) => identifiers
     | Pexp_construct(_, Some(expr)) => getIdentsInner(expr, identifiers)
     | Pexp_variant(_, Some(expr)) => getIdentsInner(expr, identifiers)
     | Pexp_variant(_, _) => identifiers
@@ -107,8 +107,8 @@ let useEffectExpand = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
   | Pexp_apply(
       {
-        pexp_desc: Pexp_ident({loc, txt: _, _}),
-        pexp_loc,
+        pexp_desc: Pexp_ident({loc: _loc, txt: _, _}),
+        pexp_loc: _,
         pexp_attributes: _,
         pexp_loc_stack: _,
       },
