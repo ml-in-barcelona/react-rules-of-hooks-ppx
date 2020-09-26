@@ -8,7 +8,6 @@ let make = (~randomProp: string) => {
     () => {
       Js.log(show);
       setShow(_ => randomProp);
-
       None;
     },
     [|show|],

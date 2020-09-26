@@ -8,20 +8,15 @@
     "server": "moduleserve ./ --port 8000",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "BuckleScript",
-    "ReasonReact",
-    "reason-react"
-  ],
+  "keywords": [ "BuckleScript", "ReasonReact", "reason-react" ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@opam/base": "v0.14.0",
+    "batteries": "^0.4.2",
     "react": "^16.8.1",
     "react-dom": "^16.8.1",
     "reason-react": ">=0.7.0"
   },
-  "devDependencies": {
-    "bs-platform": "^7.0.1",
-    "moduleserve": "^0.9.0"
-  }
+  "devDependencies": { "bs-platform": "^7.0.1", "moduleserve": "^0.9.0" }
 }

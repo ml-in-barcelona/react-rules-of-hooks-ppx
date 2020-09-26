@@ -348,12 +348,12 @@ module Parsetree = {
           Invariant: n >= 2
        */
     | Pexp_construct(loc(Longident.t), option(expression))
-    /* C                None
+    /*    C                None
           C E              Some E
           C (E1, ..., En)  Some (Pexp_tuple[E1;...;En])
        */
     | Pexp_variant(label, option(expression))
-    /* `A             (None)
+    /*    `A             (None)
           `A E           (Some E)
        */
     | Pexp_record(
