@@ -7,7 +7,7 @@ let make = (~randomProp: string) => {
   useEffect1(
     () => {
       Js.log(show);
-      setShow(_ => randomProp);
+      /*       setShow(_ => randomProp); */
       None;
     },
     [|show|],

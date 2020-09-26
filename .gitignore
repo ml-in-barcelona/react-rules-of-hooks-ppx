@@ -55,3 +55,6 @@ npm-debug.log
 
 # Vim
 .*.swp
+
+**.bs.js
+**.xre
