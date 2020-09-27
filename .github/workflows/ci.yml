@@ -57,11 +57,12 @@ jobs:
         run: esy test
 
       - name: Create npm package
-        run: esy npm-release
+        run: esy build
+
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.os }}
-          path: _release/
+          path: _build/default/bin/Bin.exe
 
       # Cleanup build cache if dependencies have changed
       - name: Clean build cache
@@ -152,8 +153,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ steps.sha.outputs.sha_short }}
+          release_name: Release ${{ steps.sha.outputs.sha_short }}
           draft: false
           prerelease: false
 
