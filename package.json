@@ -14,14 +14,7 @@
   ],
   "esy": {
     "buildsInSource": "_build",
-    "build": [
-      [
-        "dune",
-        "build",
-        "-p",
-        "ReactRulesOfHooksPpx"
-      ]
-    ],
+    "build": "dune build -p ReactRulesOfHooksPpx",
     "buildDev": [
       [
         "dune",
@@ -56,6 +49,7 @@
     "@esy-ocaml/reason": "facebook/reason:reason.json#773dbcd"
   },
   "scripts": {
+    "build": "esy dune build -p ReactRulesOfHooksPpx",
     "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
     "test": "esy x Run.exe",
     "doc": "esy dune build @doc",

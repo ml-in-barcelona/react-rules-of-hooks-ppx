@@ -57,11 +57,12 @@ jobs:
         run: esy test
 
       - name: Create npm package
-        run: esy npm-release
+        run: esy build
+
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.os }}
-          path: _release/
+          path: _build/default/bin/Bin.exe
 
       # Cleanup build cache if dependencies have changed
       - name: Clean build cache
