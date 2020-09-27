@@ -38,7 +38,7 @@ let getIdents = (expression: Parsetree.expression) => {
         valueBindings
         |> List.map(value =>
              switch (value.pvb_pat.ppat_desc) {
-             | Ppat_var({txt}) => Some(txt)
+             | Ppat_var({txt, _}) => Some(txt)
              | _ => None
              }
            )
@@ -64,7 +64,7 @@ let getIdents = (expression: Parsetree.expression) => {
     | Pexp_variant(_, Some(expr)) => getIdentsInner(expr, meta)
     | Pexp_record(fields, Some(expr)) =>
       let exprs = List.map(snd, fields);
-      pushIdentList(exprs);
+      pushIdentList([expr, ...exprs]);
     | Pexp_record(fields, None) =>
       let exprs = List.map(snd, fields);
       pushIdentList(exprs);
