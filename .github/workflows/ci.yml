@@ -169,7 +169,6 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Release nightly NPM package
-        if: github.event_name == 'pull_request'
         run: |
           npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
           npm version prerelease --preid nightly.${{ steps.sha.outputs.sha_short }} -no-git-tag-version
