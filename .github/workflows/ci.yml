@@ -153,8 +153,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ steps.sha.outputs.sha_short }}
+          release_name: Release ${{ steps.sha.outputs.sha_short }}
           draft: false
           prerelease: false
 
