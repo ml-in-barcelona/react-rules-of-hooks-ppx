@@ -169,11 +169,12 @@ jobs:
           asset_content_type: application/gzip
 
       - name: Release nightly NPM package
+        if: "!startsWith(github.ref, 'refs/tags/v')"
         run: |
           npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
           npm version prerelease --preid nightly.${{ steps.sha.outputs.sha_short }} -no-git-tag-version
           npm publish --access public --tag nightly
-        working-directory: ./_release
+        working-directory: ./release
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -182,6 +183,6 @@ jobs:
         run: |
           npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
           npm publish --access public
-        working-directory: ./_release
+        working-directory: ./release
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
