@@ -16,8 +16,8 @@ let rec unique = lst =>
 let quotes = str => "'" ++ str ++ "'";
 
 type meta = {
-  ids: list(longident),
-  values: list(string),
+  ids: list(longident), /* List of identifiers */
+  values: list(string) /* List of values in scope of useEffect */
 };
 
 let getIdents = (expression: Parsetree.expression) => {
