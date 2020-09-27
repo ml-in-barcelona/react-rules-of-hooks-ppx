@@ -4,52 +4,184 @@ on:
   push:
     branches:
       - master
+    tags:
+      - v*
   pull_request:
     branches:
       - master
 
 jobs:
-  test:
-    name: Native
+  build-test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        node-version: [12.x]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v1
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
         with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Cache esy dependencies
-        uses: actions/cache@v1
-        id: cache
-        with:
-          path: _export
-          key: ${{ runner.OS }}-build-${{ hashFiles('esy.lock/index.json') }}
-          restore-keys: |
-            ${{ runner.OS }}-build-${{ env.cache-name }}-
-            ${{ runner.OS }}-build-
-            ${{ runner.OS }}-
-
+          node-version: 12
       - name: Install esy
-        run: npm install -g esy@0.6.6
+        run: npm install -g esy@0.6.7
 
-      - name: Import dependencies
-        if: steps.cache.outputs.cache-hit == 'true'
-        run: esy import-build _export/*
+      - name: Try to restore install cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.esy/source
+          key: source-${{ matrix.os }}-${{ hashFiles('**/index.json') }}
 
       - name: Install dependencies
         run: esy install
 
-      - name: Build
+      - name: Print esy cache
+        id: print_esy_cache
+        run: node .github/workflows/print-esy-cache.js
+
+      - name: Try to restore dependencies cache
+        id: deps-cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.print_esy_cache.outputs.esy_cache }}
+          key: build-${{ matrix.os }}-${{ hashFiles('**/index.json') }}
+          restore-keys: build-${{ matrix.os }}-
+
+      - name: Build dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: esy build-dependencies
+
+      - name: Build project
         run: esy build
 
-      - name: Run tests
+      - name: Run Native tests
         run: esy test
 
-      - name: Export dependencies
-        run: esy export-dependencies
+      - name: Create npm package
+        run: esy npm-release
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ matrix.os }}
+          path: _release/
+
+      # Cleanup build cache if dependencies have changed
+      - name: Clean build cache
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: esy cleanup .
+
+  prepare-publish:
+    name: Prepare publish to npm
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - uses: actions/checkout@v2
+
+      # Download platform artifacts
+      - name: Download Linux release
+        uses: actions/download-artifact@v2
+        with:
+          name: ubuntu-latest
+          path: ubuntu-latest
+      - name: Download Windows release
+        uses: actions/download-artifact@v2
+        with:
+          name: windows-latest
+          path: windows-latest
+      - name: Download macOS release
+        uses: actions/download-artifact@v2
+        with:
+          name: macos-latest
+          path: macos-latest
+      # Move artifacts in place
+      - name: Move artifacts
+        run: |
+          mkdir -p _release/platform-linux
+          mkdir -p _release/platform-windows-x64
+          mkdir -p _release/platform-darwin
+          cp -a ubuntu-latest/. _release/platform-linux
+          cp -a windows-latest/. _release/platform-windows-x64
+          cp -a macos-latest/. _release/platform-darwin
+      - name: Prepare package
+        run: node .github/workflows/release.js
+      # Create a npm package that can easily be published and tested
+      - name: npm pack
+        run: npm pack .
+        working-directory: _release
+      - name: move package
+        run: mv _release/*.tgz react-rules-of-hooks-ppx.tgz
+      # Upload artifacts
+      - uses: actions/upload-artifact@v2
+        with:
+          name: release
+          path: _release/
+      - uses: actions/upload-artifact@v2
+        with:
+          name: release-tarball
+          path: react-rules-of-hooks-ppx.tgz
+
+  publish:
+    needs: prepare-publish
+    name: (only on release) Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Use Node.js 12.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12.x
+
+      - name: Print short SHA
+        id: sha
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
+      - name: Download release
+        uses: actions/download-artifact@v2
+        with:
+          name: release
+          path: release
+
+      - name: Zip release folder
+        run: zip -r release.zip release
+
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload ubuntu-latest to Github release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release.zip
+          asset_name: release.zip
+          asset_content_type: application/gzip
+
+      - name: Release nightly NPM package
+        if: github.event_name == 'pull_request'
+        run: |
+          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
+          npm version prerelease --preid nightly.${{ steps.sha.outputs.sha_short }} -no-git-tag-version
+          npm publish --access public --tag nightly
+        working-directory: ./_release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Release NPM package
+        if: "startsWith(github.ref, 'refs/tags/v')"
+        run: |
+          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
+          npm publish --access public
+        working-directory: ./_release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
