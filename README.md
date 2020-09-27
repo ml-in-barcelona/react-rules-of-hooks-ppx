@@ -12,7 +12,7 @@ yarn add react-rules-of-hooks-ppx --dev
 Add the ppx on the BuckleScript config (`bsconfig.json`)
 ```json
 "ppx-flags": [
-  "react-rules-of-hooks-ppx"
+  "react-rules-of-hooks-ppx/Bin.exe"
 ]
 ```
 
