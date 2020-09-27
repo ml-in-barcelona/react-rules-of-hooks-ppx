@@ -14,14 +14,6 @@ var cp = require("child_process");
 var fs = require("fs");
 var platform = process.platform;
 
-var packageJson = require("./package.json");
-var binariesToCopy = Object.keys(packageJson.bin)
-  .map(function (name) {
-    return packageJson.bin[name];
-  })
-  .concat(["esyInstallRelease.js"]);
-var foldersToCopy = ["bin", "_export"];
-
 function copyRecursive(srcDir, dstDir) {
   var results = [];
   var list = fs.readdirSync(srcDir);
@@ -127,16 +119,10 @@ function copyFileSync(sourcePath, destPath) {
   fs.chmodSync(destPath, stat.mode);
 }
 
+var binariesToCopy = ["Bin.exe"];
+
 var copyPlatformBinaries = (platformPath) => {
   var platformBuildPath = path.join(__dirname, "platform-" + platformPath);
-
-  foldersToCopy.forEach((folderPath) => {
-    var sourcePath = path.join(platformBuildPath, folderPath);
-    var destPath = path.join(__dirname, folderPath);
-
-    copyRecursive(sourcePath, destPath);
-  });
-
   binariesToCopy.forEach((binaryPath) => {
     var sourcePath = path.join(platformBuildPath, binaryPath);
     var destPath = path.join(__dirname, binaryPath);

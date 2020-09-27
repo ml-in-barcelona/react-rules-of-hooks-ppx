@@ -46,10 +46,8 @@ const packageJson = JSON.stringify(
     },
     bin: bins,
     files: [
-      "_export/",
       "bin/",
       "postinstall.js",
-      "esyInstallRelease.js",
       "platform-linux/",
       "platform-darwin/",
       "platform-windows-x64/",
