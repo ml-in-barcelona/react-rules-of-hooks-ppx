@@ -7,6 +7,12 @@ let raiseWithLoc = (~loc, msg, variables) =>
 
 let diff = (list1, list2) => List.filter(x => !List.mem(x, list2), list1);
 
+let rec unique = lst =>
+  switch (lst) {
+  | [] => []
+  | [h, ...t] => [h, ...unique(List.filter(x => x != h, t))]
+  };
+
 let quotes = str => "'" ++ str ++ "'";
 
 let getIdents = (expression: Parsetree.expression) => {
@@ -136,6 +142,7 @@ let useEffectExpand = (e: Parsetree.expression) =>
       let missingDependencies =
         result
         |> List.map(Longident.name)
+        |> unique
         |> List.map(quotes)
         |> String.concat(", ");
 
