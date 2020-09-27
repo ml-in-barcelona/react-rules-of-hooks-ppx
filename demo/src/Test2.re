@@ -2,16 +2,14 @@
 let useDebounce = (value, delay) => {
   let (debouncedValue, setDebouncedValue) = React.useState(_ => value);
 
-  React.useEffect1(
+  React.useEffect2(
     () => {
       let handler =
         Js.Global.setTimeout(() => setDebouncedValue(_ => value), delay);
 
-      Js.log(handler);
-
-      None;
+      Some(() => Js.Global.clearTimeout(handler));
     },
-    [|value|],
+    (value, delay),
   );
 
   debouncedValue;
