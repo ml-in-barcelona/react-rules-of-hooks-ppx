@@ -2,6 +2,9 @@
 
 This ppx validates the rules of React hooks.
 
+- Exhaustive dependencies in useEffect
+- WIP - Hooks shoudn't be called in different order
+
 ### Install
 ```bash
 npm install react-rules-of-hooks-ppx --save-dev
@@ -60,7 +63,7 @@ Error: ExhaustiveDeps: Missing 'randomProp' in the dependency array
 
 ### Issues
 
-This ppx is in an early stage ⚠️. Feel free to use it and report any unexpected behaviour https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc
+This ppx is in an early stage ⚠️. Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
 
 ### Acknowledgements
-[@jchavarri](https://github.com/jchavarri)
+Thanks to [@jchavarri](https://github.com/jchavarri)
