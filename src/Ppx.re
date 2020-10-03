@@ -152,11 +152,80 @@ let useEffectExpand = (e: Parsetree.expression) =>
   | _ => None
   };
 
+let startsWith = (affix, str) => {
+  let start = String.sub(str, 0, String.length(affix) - 1);
+  start == affix;
+};
+
+type acc = {
+  isInsideConditional: bool,
+  functionLocations: list(Location.t),
+};
+
+let findConditionalHooks = {
+  let isAHook = expr => {
+    switch (expr.pexp_desc) {
+    | Pexp_ident({txt: Lident(l), _}) => startsWith("use", l)
+    | _ => false
+    };
+  };
+
+  {
+    as _;
+    inherit class Ast_traverse.fold(acc) as super;
+    pub! expression = (t, acc) => {
+      switch (t.pexp_desc) {
+      /* Found an invalid application of "use" */
+      | Pexp_apply(fn, _args) when isAHook(fn) && acc.isInsideConditional =>
+        print_endline("HOOKS");
+        let acc = super#expression(t, acc);
+        {...acc, functionLocations: [t.pexp_loc, ...acc.functionLocations]};
+
+      /* We're entering a conditional for the first time; enable the flag appropriately */
+      | Pexp_ifthenelse(if_, then_, else_) when !acc.isInsideConditional =>
+        let acc = super#expression(if_, {...acc, isInsideConditional: true});
+        /* Set the flag and recurse into the conditional branches */
+        let acc =
+          super#expression(then_, {...acc, isInsideConditional: true});
+
+        print_endline("WATT");
+
+        let acc =
+          switch (else_) {
+          | Some(expr) =>
+            super#expression(expr, {...acc, isInsideConditional: true})
+          | None => acc
+          };
+
+        {...acc, isInsideConditional: false};
+
+      /* Don't care about the remaining cases; just recurse into sub-expressions */
+      | _ => super#expression(t, acc)
+      };
+    }
+  }#
+    structure;
+};
+
+let conditionalHooksLinter = (structure: Parsetree.structure) => {
+  let {functionLocations} =
+    findConditionalHooks(
+      structure,
+      {isInsideConditional: false, functionLocations: []},
+    );
+
+  functionLocations
+  |> List.map(loc =>
+       Driver.Lint_error.of_string(
+         loc,
+         "Hooks can't be inside conditionals, neither loops.",
+       )
+     );
+};
+
 let () =
-  /* TODO: Instead of register_transformation, try register_correction
-     which suggest the corrected AST to the user. In the useEffect dependency
-     case, it should print the expression with the new dependency array. */
   Driver.register_transformation(
+    ~lint_impl=conditionalHooksLinter,
     ~rules=[
       Context_free.Rule.special_function("React.useEffect", useEffectExpand),
       Context_free.Rule.special_function("useEffect", useEffectExpand),
