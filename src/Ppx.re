@@ -158,17 +158,23 @@ let startsWith = (affix, str) => {
 };
 
 type acc = {
-  isInsideConditional: bool,
-  functionLocations: list(Location.t),
+  isInside: bool,
+  locations: list(Location.t),
 };
 
 let findConditionalHooks = {
-  let isAHook = lident =>
+  let getName = lident => {
     switch (lident) {
-    | Lident(l)
-    | Ldot(_, l) => startsWith("use", l)
-    | _ => false
+    | Lident(l) => l
+    | Ldot(_, l) => l
+    | _ => ""
     };
+  };
+
+  let isAHook = lident => {
+    let name = getName(lident);
+    startsWith("use", name);
+  };
 
   {
     as _;
@@ -176,39 +182,34 @@ let findConditionalHooks = {
     pub! expression = (t, acc) => {
       switch (t.pexp_desc) {
       | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _})}, _args)
-          when isAHook(lident) && acc.isInsideConditional =>
+          when isAHook(lident) && acc.isInside =>
+        let f = getName(lident);
+        print_endline("hook " ++ f);
         let acc = super#expression(t, acc);
-        {...acc, functionLocations: [t.pexp_loc, ...acc.functionLocations]};
-
+        {...acc, locations: [t.pexp_loc, ...acc.locations]};
       | Pexp_match(_expr, listOfExpr) =>
         List.fold_left(
           (acc, expr) =>
-            super#expression(
-              expr.pc_rhs,
-              {...acc, isInsideConditional: true},
-            ),
+            super#expression(expr.pc_rhs, {...acc, isInside: true}),
           acc,
           listOfExpr,
         )
+
       | Pexp_while(_cond, expr) =>
-        super#expression(expr, {...acc, isInsideConditional: true})
+        super#expression(expr, {...acc, isInside: true})
       | Pexp_for(_, _, _, _, expr) =>
-        super#expression(expr, {...acc, isInsideConditional: true})
-      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr)
-          when !acc.isInsideConditional =>
-        let acc =
-          super#expression(ifExpr, {...acc, isInsideConditional: true});
-        let acc =
-          super#expression(thenExpr, {...acc, isInsideConditional: true});
+        super#expression(expr, {...acc, isInside: true})
+      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr) =>
+        let acc = super#expression(ifExpr, {...acc, isInside: true});
+        let acc = super#expression(thenExpr, {...acc, isInside: true});
 
         let acc =
           switch (elseExpr) {
-          | Some(expr) =>
-            super#expression(expr, {...acc, isInsideConditional: true})
+          | Some(expr) => super#expression(expr, {...acc, isInside: true})
           | None => acc
           };
 
-        {...acc, isInsideConditional: false};
+        {...acc, isInside: false};
       | _ => super#expression(t, acc)
       };
     }
@@ -217,13 +218,10 @@ let findConditionalHooks = {
 };
 
 let conditionalHooksLinter = (structure: Parsetree.structure) => {
-  let {functionLocations} =
-    findConditionalHooks(
-      structure,
-      {isInsideConditional: false, functionLocations: []},
-    );
+  let {locations} =
+    findConditionalHooks(structure, {isInside: false, locations: []});
 
-  functionLocations
+  locations
   |> unique
   |> List.map(loc =>
        Driver.Lint_error.of_string(

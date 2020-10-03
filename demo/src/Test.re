@@ -2,14 +2,11 @@ let useMierda = () => {
   ();
 };
 
-[@react.component]
-let make = (~randomProp) => {
-  switch (randomProp) {
+if (true) {
+  switch (Some(3)) {
   | Some(_a) => useMierda()
   | None => useMierda()
   };
-
-  <div />;
 };
 
 /* [@react.component]
