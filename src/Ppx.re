@@ -180,6 +180,20 @@ let findConditionalHooks = {
         let acc = super#expression(t, acc);
         {...acc, functionLocations: [t.pexp_loc, ...acc.functionLocations]};
 
+      | Pexp_match(_expr, listOfExpr) =>
+        List.fold_left(
+          (acc, expr) =>
+            super#expression(
+              expr.pc_rhs,
+              {...acc, isInsideConditional: true},
+            ),
+          acc,
+          listOfExpr,
+        )
+      | Pexp_while(_cond, expr) =>
+        super#expression(expr, {...acc, isInsideConditional: true})
+      | Pexp_for(_, _, _, _, expr) =>
+        super#expression(expr, {...acc, isInsideConditional: true})
       | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr)
           when !acc.isInsideConditional =>
         let acc =

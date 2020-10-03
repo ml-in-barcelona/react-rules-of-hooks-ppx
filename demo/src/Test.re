@@ -1,26 +1,35 @@
-open React;
 let useMierda = () => {
   ();
 };
 
 [@react.component]
-let make = (~randomProp as _: string) => {
-  let (show, _setShow) = React.useState(() => "sTatE");
-
-  if (show === "state") {
-    useMierda();
-    useEffect1(
-      () => {
-        Js.log(show);
-        None;
-      },
-      [|show|],
-    );
+let make = (~randomProp) => {
+  switch (randomProp) {
+  | Some(_a) => useMierda()
+  | None => useMierda()
   };
 
   <div />;
 };
 
+/* [@react.component]
+   let make = (~randomProp as _: string) => {
+     let (show, _setShow) = React.useState(() => "sTatE");
+
+     if (show === "state") {
+       useMierda();
+       useEffect1(
+         () => {
+           Js.log(show);
+           None;
+         },
+         [|show|],
+       );
+     };
+
+     <div />;
+   };
+    */
 /* React.useEffect2(
      () => {
        Document.addMouseDownEventListener(onClickHandler, document);
