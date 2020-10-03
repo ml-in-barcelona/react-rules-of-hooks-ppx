@@ -153,7 +153,7 @@ let useEffectExpand = (e: Parsetree.expression) =>
   };
 
 let startsWith = (affix, str) => {
-  let start = String.sub(str, 0, String.length(affix) - 1);
+  let start = String.sub(str, 0, String.length(affix));
   start == affix;
 };
 
@@ -163,43 +163,38 @@ type acc = {
 };
 
 let findConditionalHooks = {
-  let isAHook = expr => {
-    switch (expr.pexp_desc) {
-    | Pexp_ident({txt: Lident(l), _}) => startsWith("use", l)
+  let isAHook = lident =>
+    switch (lident) {
+    | Lident(l)
+    | Ldot(_, l) => startsWith("use", l)
     | _ => false
     };
-  };
 
   {
     as _;
     inherit class Ast_traverse.fold(acc) as super;
     pub! expression = (t, acc) => {
       switch (t.pexp_desc) {
-      /* Found an invalid application of "use" */
-      | Pexp_apply(fn, _args) when isAHook(fn) && acc.isInsideConditional =>
-        print_endline("HOOKS");
+      | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _})}, _args)
+          when isAHook(lident) && acc.isInsideConditional =>
         let acc = super#expression(t, acc);
         {...acc, functionLocations: [t.pexp_loc, ...acc.functionLocations]};
 
-      /* We're entering a conditional for the first time; enable the flag appropriately */
-      | Pexp_ifthenelse(if_, then_, else_) when !acc.isInsideConditional =>
-        let acc = super#expression(if_, {...acc, isInsideConditional: true});
-        /* Set the flag and recurse into the conditional branches */
+      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr)
+          when !acc.isInsideConditional =>
         let acc =
-          super#expression(then_, {...acc, isInsideConditional: true});
-
-        print_endline("WATT");
+          super#expression(ifExpr, {...acc, isInsideConditional: true});
+        let acc =
+          super#expression(thenExpr, {...acc, isInsideConditional: true});
 
         let acc =
-          switch (else_) {
+          switch (elseExpr) {
           | Some(expr) =>
             super#expression(expr, {...acc, isInsideConditional: true})
           | None => acc
           };
 
         {...acc, isInsideConditional: false};
-
-      /* Don't care about the remaining cases; just recurse into sub-expressions */
       | _ => super#expression(t, acc)
       };
     }
@@ -215,6 +210,7 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
     );
 
   functionLocations
+  |> unique
   |> List.map(loc =>
        Driver.Lint_error.of_string(
          loc,

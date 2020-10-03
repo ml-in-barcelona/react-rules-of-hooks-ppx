@@ -1,9 +1,15 @@
+open React;
+let useMierda = () => {
+  ();
+};
+
 [@react.component]
 let make = (~randomProp as _: string) => {
   let (show, _setShow) = React.useState(() => "sTatE");
 
   if (show === "state") {
-    React.useEffect1(
+    useMierda();
+    useEffect1(
       () => {
         Js.log(show);
         None;
