@@ -47,17 +47,19 @@ let getIdents = (expression: Parsetree.expression) => {
 
       let newMeta = pushIdentList([expr, ...exprs]);
       {...newMeta, values};
-    /* TODO: list(case) */
-    | Pexp_function(_) => meta
+    | Pexp_function(case) =>
+      let exprs = List.map(case => case.pc_rhs, case);
+      pushIdentList(exprs);
     | Pexp_fun(_, _, _, expr) => getIdentsInner(expr, meta)
-    /* This ignores any function expression, since those aren't checked */
     | Pexp_apply(_expr, labeledExpr) =>
       let exprs = List.map(snd, labeledExpr);
       pushIdentList(exprs);
-    /* TODO: list(case) */
-    | Pexp_match(expr, _) => getIdentsInner(expr, meta)
-    /* TODO: list(case) */
-    | Pexp_try(expr, _) => getIdentsInner(expr, meta)
+    | Pexp_match(expr, cases) =>
+      let exprs = [expr, ...List.map(case => case.pc_rhs, cases)];
+      pushIdentList(exprs);
+    | Pexp_try(expr, cases) =>
+      let exprs = [expr, ...List.map(case => case.pc_rhs, cases)];
+      pushIdentList(exprs);
     | Pexp_tuple(exprs) => pushIdentList(exprs)
     | Pexp_construct({txt: Lident("None"), _}, _) => meta
     | Pexp_construct(_, Some(expr)) => getIdentsInner(expr, meta)
