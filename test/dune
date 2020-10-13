@@ -1,16 +1,64 @@
-(library
- (name ReactRulesOfHooksPpxTest)
- (ocamlopt_flags -linkall -g)
- (libraries ReactRulesOfHooksPpx.lib rely.lib)
- (modules
-  (:standard \ Run)
+; -------- Test: `ExhaustiveDeps` --------
+(rule
+ (targets ExhaustiveDepsUseEffect.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input ExhaustiveDepsUseEffect.ml)
+ )
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -o %{input}")
+  )
  )
 )
 
-(executable
- (package ReactRulesOfHooksPpx)
- (name Run)
- (public_name Run.exe)
- (libraries ReactRulesOfHooksPpxTest)
- (modules Run)
+(rule
+ (targets ExhaustiveDepsUseEffect.ml)
+ (deps ExhaustiveDepsUseEffect.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
+; -------- Test: `ConditionalHooks` --------
+(rule
+ (targets ConditionalHooks.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input ConditionalHooks.ml)
+ )
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -o %{input}")
+  )
+ )
+)
+
+(rule
+ (targets ConditionalHooks.ml)
+ (deps ConditionalHooks.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
+; Compare the post-processed output to the .expected file
+(rule
+ (alias runtest)
+ (action
+  (progn
+   ; (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
+   (diff ConditionalHooks.expected ConditionalHooks.actual)
+  )
+ )
 )

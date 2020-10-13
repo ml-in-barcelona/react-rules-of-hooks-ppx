@@ -183,7 +183,7 @@ let findConditionalHooks = {
     inherit class Ast_traverse.fold(acc) as super;
     pub! expression = (t, acc) => {
       switch (t.pexp_desc) {
-      | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _})}, _args)
+      | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _}), _}, _args)
           when isAHook(lident) && acc.isInside =>
         let f = getName(lident);
         print_endline("hook " ++ f);
@@ -220,7 +220,7 @@ let findConditionalHooks = {
 };
 
 let conditionalHooksLinter = (structure: Parsetree.structure) => {
-  let {locations} =
+  let {locations, _} =
     findConditionalHooks(structure, {isInside: false, locations: []});
 
   locations
