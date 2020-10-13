@@ -1,4 +1,4 @@
-File "ExhaustiveDepsUseEffect.ml", line 3, characters 2-63:
+[1mFile "ExhaustiveDepsUseEffect.ml", line 3, characters 2-63[0m:
 3 |   React.useEffect1 (fun () -> Js.log randomProp; None) [|show|];
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: ExhaustiveDeps: Missing 'randomProp' in the dependency array
+      [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;31mError[0m: ExhaustiveDeps: Missing 'randomProp' in the dependency array

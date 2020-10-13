@@ -9,7 +9,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -o %{input}")
+   (bash "! ./%{pp} %{input}")
   )
  )
 )
@@ -33,10 +33,12 @@
   (:input ConditionalHooks.ml)
  )
  (action
-  ; expect the process to fail, capturing stderr
-  (with-stderr-to
-   %{targets}
-   (bash "! ./%{pp} -o %{input}")
+  (progn
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to
+    %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
   )
  )
 )
@@ -45,9 +47,11 @@
  (targets ConditionalHooks.ml)
  (deps ConditionalHooks.re)
  (action
-  (with-stdout-to
-   %{targets}
-   (run refmt --parse=re --print=ml %{deps})
+  (progn
+   (with-stdout-to
+    %{targets}
+    (run refmt --parse=re --print=ml %{deps})
+   )
   )
  )
 )
@@ -57,7 +61,7 @@
  (alias runtest)
  (action
   (progn
-   ; (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
+   (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
    (diff ConditionalHooks.expected ConditionalHooks.actual)
   )
  )
