@@ -1,21 +1,7 @@
 {
-  "checksum": "477a4258f08222855a7e5ee2bf5ea73e",
+  "checksum": "75e1230e24ec69797f20c38defed02e4",
   "root": "react-rules-of-hooks-ppx@link-dev:./package.json",
   "node": {
-    "reason-react@0.9.1@d41d8cd9": {
-      "id": "reason-react@0.9.1@d41d8cd9",
-      "name": "reason-react",
-      "version": "0.9.1",
-      "source": {
-        "type": "install",
-        "source": [
-          "archive:https://registry.npmjs.org/reason-react/-/reason-react-0.9.1.tgz#sha1:30a887158200b659aa03e2d75ff4cc54dc462bb0"
-        ]
-      },
-      "overrides": [],
-      "dependencies": [],
-      "devDependencies": []
-    },
     "react-rules-of-hooks-ppx@link-dev:./package.json": {
       "id": "react-rules-of-hooks-ppx@link-dev:./package.json",
       "name": "react-rules-of-hooks-ppx",
@@ -26,7 +12,7 @@
         "manifest": "package.json"
       },
       "overrides": [],
-      "dependencies": [ "reason-react@0.9.1@d41d8cd9" ],
+      "dependencies": [],
       "devDependencies": [
         "ocaml@4.10.0@d41d8cd9", "@reason-native/rely@3.2.1@d41d8cd9",
         "@opam/ppxlib@opam:0.14.0@6168b34e",

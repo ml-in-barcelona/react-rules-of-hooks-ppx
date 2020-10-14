@@ -55,6 +55,9 @@ jobs:
           cat _build/default/test/ExhaustiveDepsUseEffect.expected
           echo "--------------------"
           esy test
+        env:
+          OCAML_ERROR_STYLE: "short"
+          OCAML_COLOR: "never"
 
       - uses: actions/upload-artifact@v2
         with:

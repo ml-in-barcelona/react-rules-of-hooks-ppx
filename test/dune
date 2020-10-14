@@ -9,7 +9,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -impl %{input}")
+   (bash "! ./%{pp} -no-color -impl %{input}")
   )
  )
 )
@@ -44,7 +44,7 @@
   (:input ConditionalHooks.ml)
  )
  (action
-  (bash "! ./%{pp} -impl %{input} > %{targets} || true")
+  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
  )
 )
 
