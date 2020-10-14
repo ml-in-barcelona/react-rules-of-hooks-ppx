@@ -1,5 +1,5 @@
 {
-  "checksum": "b32a10db9aedc97152e7592e66ff78e0",
+  "checksum": "477a4258f08222855a7e5ee2bf5ea73e",
   "root": "react-rules-of-hooks-ppx@link-dev:./package.json",
   "node": {
     "reason-react@0.9.1@d41d8cd9": {

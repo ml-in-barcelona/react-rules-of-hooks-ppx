@@ -155,7 +155,11 @@ let useEffectExpand = (e: Parsetree.expression) =>
   };
 
 let startsWith = (affix, str) => {
-  let start = String.sub(str, 0, String.length(affix));
+  let start =
+    try(String.sub(str, 0, String.length(affix))) {
+    | _ => ""
+    };
+
   start == affix;
 };
 
@@ -178,17 +182,17 @@ let findConditionalHooks = {
     startsWith("use", name);
   };
 
-  {
+  let linter = {
     as _;
     inherit class Ast_traverse.fold(acc) as super;
     pub! expression = (t, acc) => {
+      let acc = super#expression(t, acc);
       switch (t.pexp_desc) {
       | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _}), _}, _args)
-          when isAHook(lident) && acc.isInside =>
-        let f = getName(lident);
-        print_endline("hook " ++ f);
-        let acc = super#expression(t, acc);
-        {...acc, locations: [t.pexp_loc, ...acc.locations]};
+          when isAHook(lident) && acc.isInside => {
+          ...acc,
+          locations: [t.pexp_loc, ...acc.locations],
+        }
       | Pexp_match(_expr, listOfExpr) =>
         List.fold_left(
           (acc, expr) =>
@@ -196,12 +200,11 @@ let findConditionalHooks = {
           acc,
           listOfExpr,
         )
-
       | Pexp_while(_cond, expr) =>
         super#expression(expr, {...acc, isInside: true})
       | Pexp_for(_, _, _, _, expr) =>
         super#expression(expr, {...acc, isInside: true})
-      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr) =>
+      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr) when !acc.isInside =>
         let acc = super#expression(ifExpr, {...acc, isInside: true});
         let acc = super#expression(thenExpr, {...acc, isInside: true});
 
@@ -211,12 +214,13 @@ let findConditionalHooks = {
           | None => acc
           };
 
-        {...acc, isInside: false};
+        {...acc, isInside: true};
       | _ => super#expression(t, acc)
       };
     }
-  }#
-    structure;
+  };
+
+  linter#structure;
 };
 
 let conditionalHooksLinter = (structure: Parsetree.structure) => {

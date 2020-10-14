@@ -39,7 +39,7 @@
     "@opam/merlin": "*",
     "ocaml": "4.10.0",
     "@esy-ocaml/reason": ">= 3.6.0 < 4.0.0",
-    "@opam/dune": "> 1.11.4",
+    "@opam/dune": "2.7.1",
     "@opam/ocaml-migrate-parsetree": "^1.7.3",
     "@opam/ppxlib": "0.14.0",
     "@reason-native/rely": "^3.2.1",

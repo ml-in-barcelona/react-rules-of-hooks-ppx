@@ -1,0 +1,6 @@
+[@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
+let useMouseHook () = ()
+let make ~randomProp  =
+  if randomProp == "state" then useMouseHook ();
+  ((div ~children:[] ())
+  [@JSX ])[@@react.component ]

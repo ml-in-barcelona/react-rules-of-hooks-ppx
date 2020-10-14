@@ -9,7 +9,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} %{input}")
+   (bash "! ./%{pp} -no-color -impl %{input}")
   )
  )
 )
@@ -33,13 +33,7 @@
   (:input ConditionalHooks.ml)
  )
  (action
-  (progn
-   ; expect the process to fail, capturing stderr
-   (with-stderr-to
-    %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
+  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
  )
 )
 
@@ -47,11 +41,9 @@
  (targets ConditionalHooks.ml)
  (deps ConditionalHooks.re)
  (action
-  (progn
-   (with-stdout-to
-    %{targets}
-    (run refmt --parse=re --print=ml %{deps})
-   )
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
   )
  )
 )
