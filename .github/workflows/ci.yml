@@ -51,10 +51,10 @@ jobs:
         run: esy build
 
       - name: Run Native tests
-        run: esy b dune runtest --force
-
-      - name: Create npm package
-        run: esy build
+        run: |
+          cat _build/default/test/ExhaustiveDepsUseEffect.expected
+          echo "--------------------"
+          esy b dune runtest --force
 
       - uses: actions/upload-artifact@v2
         with:
