@@ -51,7 +51,7 @@ jobs:
         run: esy build
 
       - name: Run Native tests
-        run: esy test
+        run: esy b dune runtest --force
 
       - name: Create npm package
         run: esy build

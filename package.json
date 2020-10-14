@@ -51,7 +51,7 @@
   "scripts": {
     "build": "esy dune build -p ReactRulesOfHooksPpx",
     "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
-    "test": "esy dune runtest --force",
+    "test": "esy b dune runtest --force",
     "promote": "esy dune promote",
     "doc": "esy dune build @doc",
     "doc-path": "esy echo #{self.target_dir}/default/_doc/_html/index.html",
