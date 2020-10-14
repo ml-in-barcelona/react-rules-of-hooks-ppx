@@ -54,7 +54,7 @@ jobs:
         run: |
           cat _build/default/test/ExhaustiveDepsUseEffect.expected
           echo "--------------------"
-          esy b dune runtest --force
+          esy test
 
       - uses: actions/upload-artifact@v2
         with:
