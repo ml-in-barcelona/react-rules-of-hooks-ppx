@@ -1,6 +1,6 @@
 (executable
   (name Bin)
-  (public_name rules-of-hooks)
+  (public_name react-rules-of-hooks-ppx)
   (libraries ReactRulesOfHooksPpx.lib)
   (ocamlopt_flags ( -linkall ))
   (package ReactRulesOfHooksPpx)
