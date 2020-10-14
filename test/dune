@@ -27,17 +27,6 @@
 
 ; -------- Test: `ConditionalHooks` --------
 (rule
- (targets ConditionalHooks.actual)
- (deps
-  (:pp ../bin/Bin.exe)
-  (:input ConditionalHooks.ml)
- )
- (action
-  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
- )
-)
-
-(rule
  (targets ConditionalHooks.ml)
  (deps ConditionalHooks.re)
  (action
@@ -45,6 +34,17 @@
    %{targets}
    (run refmt --parse=re --print=ml %{deps})
   )
+ )
+)
+
+(rule
+ (targets ConditionalHooks.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input ConditionalHooks.ml)
+ )
+ (action
+  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
  )
 )
 
