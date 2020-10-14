@@ -50,7 +50,7 @@ jobs:
       - name: Build project
         run: esy build
 
-      - name: Run Native tests
+      - name: Run tests
         run: |
           cat _build/default/test/ExhaustiveDepsUseEffect.expected
           echo "--------------------"
