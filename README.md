@@ -1,9 +1,12 @@
 # react-rules-of-hooks-ppx
 
-This ppx validates the rules of React hooks.
+This ppx validates the rules of React hooks:
 
-- Exhaustive dependencies in useEffect
-- WIP - Hooks shoudn't be called in different order
+- [x] Exhaustive dependencies in useEffect
+- [x] Hooks shoudn't be called in different order
+- [] Only Call Hooks at the Top Level
+
+Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
 
 ### Install
 ```bash
@@ -44,7 +47,7 @@ let make = (~randomProp) => {
 };
 ```
 
-The ppx produces the following error:
+Produces the following error:
 
 ```bash
  6 | ..React.useEffect1(
