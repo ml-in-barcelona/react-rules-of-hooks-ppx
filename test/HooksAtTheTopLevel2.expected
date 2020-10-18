@@ -1,6 +1,8 @@
 [@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
 [@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
+[@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
 let make () =
+  useEffect ();
   useEffect ();
   ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())
   [@JSX ])[@@react.component ]

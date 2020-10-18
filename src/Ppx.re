@@ -194,7 +194,14 @@ let findConditionalHooks = {
     as _;
     inherit class Ast_traverse.fold(acc) as super;
     pub! expression = (t, acc) => {
-      let acc = super#expression(t, acc);
+      let acc =
+        super#expression(
+          t,
+          {
+            ...acc,
+            isInsideJSX: acc.isInsideJSX || containsJSX(t.pexp_attributes),
+          },
+        );
 
       switch (t.pexp_desc) {
       | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _}), _}, _args)
@@ -207,10 +214,14 @@ let findConditionalHooks = {
           ...acc,
           locations: [t.pexp_loc, ...acc.locations],
         }
-      | Pexp_apply(_, _) => {
-          ...acc,
-          isInsideJSX: containsJSX(t.pexp_attributes),
-        }
+      | Pexp_sequence(_, exp) =>
+        let acc =
+          super#expression(
+            exp,
+            {...acc, isInsideJSX: containsJSX(exp.pexp_attributes)},
+          );
+
+        acc;
       | Pexp_match(_expr, listOfExpr) =>
         List.fold_left(
           (acc, expr) =>
