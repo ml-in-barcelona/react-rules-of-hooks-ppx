@@ -48,13 +48,61 @@
  )
 )
 
+; -------- Test: `HooksAtTheTopLevel` --------
+(rule
+ (targets HooksAtTheTopLevel.ml)
+ (deps HooksAtTheTopLevel.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
+(rule
+ (targets HooksAtTheTopLevel.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input HooksAtTheTopLevel.ml)
+ )
+ (action
+  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
+ )
+)
+
+; -------- Test: `HooksAtTheTopLevel2` --------
+(rule
+ (targets HooksAtTheTopLevel2.ml)
+ (deps HooksAtTheTopLevel2.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
+(rule
+ (targets HooksAtTheTopLevel2.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input HooksAtTheTopLevel2.ml)
+ )
+ (action
+  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
+ )
+)
+
 ; Compare the post-processed output to the .expected file
 (rule
  (alias runtest)
  (action
   (progn
-   (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
-   (diff ConditionalHooks.expected ConditionalHooks.actual)
+   ; (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
+   ; (diff ConditionalHooks.expected ConditionalHooks.actual)
+   ; (diff HooksAtTheTopLevel.expected HooksAtTheTopLevel.actual)
+   (diff HooksAtTheTopLevel2.expected HooksAtTheTopLevel2.actual)
   )
  )
 )
