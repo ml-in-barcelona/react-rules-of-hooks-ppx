@@ -1,0 +1,3 @@
+[@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
+let make () = ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())
+  [@JSX ])[@@react.component ]
