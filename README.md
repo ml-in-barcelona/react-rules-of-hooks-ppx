@@ -3,8 +3,9 @@ This package is a no-op ppx rewriter. It is used as a 'lint' to
 enforce the rules of React hooks.
 
 - [x] Exhaustive dependencies in useEffect
-- [x] Only Call Hooks at the Top Level
-- [x] Hooks shoudn't be called in different order
+- [x] Order of Hooks
+  - [x] Hooks shoudn't be called in different order
+  - [x] Only Call Hooks at the Top Level
 
 Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
 
@@ -26,6 +27,22 @@ Add the ppx on the BuckleScript config (`bsconfig.json`)
 ```json
 "ppx-flags": [
   "react-rules-of-hooks-ppx/Bin.exe"
+]
+```
+
+You can disable globally both rules passing parameters to the ppx:
+
+#### Disable "Exhaustive dependencies in useEffect"
+```json
+"ppx-flags": [
+  ["react-rules-of-hooks-ppx/Bin.exe", "-exhaustive-deps"]
+]
+```
+
+#### Disable "Order of Hooks"
+```json
+"ppx-flags": [
+  ["react-rules-of-hooks-ppx/Bin.exe", "-order-of-hooks"]
 ]
 ```
 
