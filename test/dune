@@ -9,7 +9,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -no-color -impl %{input}")
+   (bash "! ./%{pp} %{input}")
   )
  )
 )
@@ -36,7 +36,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -no-color -impl %{input}")
+   (bash "! ./%{pp} %{input}")
   )
  )
 )
@@ -63,7 +63,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -no-color -impl %{input}")
+   (bash "! ./%{pp} %{input}")
   )
  )
 )
@@ -90,7 +90,7 @@
   ; expect the process to fail, capturing stderr
   (with-stderr-to
    %{targets}
-   (bash "! ./%{pp} -no-color -impl %{input}")
+   (bash "! ./%{pp} %{input}")
   )
  )
 )
