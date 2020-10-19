@@ -1,13 +1,11 @@
 # react-rules-of-hooks-ppx
 This package is a no-op ppx rewriter. It is used as a 'lint' to
-enforce the rules of React hooks.
+enforce React's [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html).
 
 - [x] Exhaustive dependencies in useEffect
 - [x] Order of Hooks
   - [x] Hooks shoudn't be called in different order
   - [x] Only Call Hooks at the Top Level
-
-Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
 
 ## Why
 One of the points of using [Reason](https://reasonml.github.io) or [ReScript](https://rescript-lang.org) is to have a compiler that warns about issues with your code, where functions expect different structures from the given ones and any sort of missmatch between interfaces. This works amazingly well, but I found a case where the compiler can't validate that your code works as expected.
