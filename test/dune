@@ -27,6 +27,21 @@
 
 ; -------- Test: `ConditionalHooks` --------
 (rule
+ (targets ConditionalHooks.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input ConditionalHooks.ml)
+ )
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color -impl %{input}")
+  )
+ )
+)
+
+(rule
  (targets ConditionalHooks.ml)
  (deps ConditionalHooks.re)
  (action
@@ -37,18 +52,22 @@
  )
 )
 
+; -------- Test: `HooksAtTheTopLevel` --------
 (rule
- (targets ConditionalHooks.actual)
+ (targets HooksAtTheTopLevel.actual)
  (deps
   (:pp ../bin/Bin.exe)
-  (:input ConditionalHooks.ml)
+  (:input HooksAtTheTopLevel.ml)
  )
  (action
-  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color -impl %{input}")
+  )
  )
 )
 
-; -------- Test: `HooksAtTheTopLevel` --------
 (rule
  (targets HooksAtTheTopLevel.ml)
  (deps HooksAtTheTopLevel.re)
@@ -60,18 +79,22 @@
  )
 )
 
+; -------- Test: `HooksAtTheTopLevel2` --------
 (rule
- (targets HooksAtTheTopLevel.actual)
+ (targets HooksAtTheTopLevel2.actual)
  (deps
   (:pp ../bin/Bin.exe)
-  (:input HooksAtTheTopLevel.ml)
+  (:input HooksAtTheTopLevel2.ml)
  )
  (action
-  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} -no-color -impl %{input}")
+  )
  )
 )
 
-; -------- Test: `HooksAtTheTopLevel2` --------
 (rule
  (targets HooksAtTheTopLevel2.ml)
  (deps HooksAtTheTopLevel2.re)
@@ -80,17 +103,6 @@
    %{targets}
    (run refmt --parse=re --print=ml %{deps})
   )
- )
-)
-
-(rule
- (targets HooksAtTheTopLevel2.actual)
- (deps
-  (:pp ../bin/Bin.exe)
-  (:input HooksAtTheTopLevel2.ml)
- )
- (action
-  (bash "! ./%{pp} -no-color -impl %{input} > %{targets} || true")
  )
 )
 

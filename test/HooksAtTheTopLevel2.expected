@@ -1,5 +1,4 @@
-[@@@ocaml.ppwarning "Hooks can't be inside conditionals, neither loops."]
-let make () =
-  let (state, setState) = React.useState () in
-  ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())[@JSX ])
-  [@@react.component ]
+[1mFile "HooksAtTheTopLevel2.ml", line 3, characters 30-45[0m:
+3 |   ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())[@JSX ])
+                                  [1;31m^^^^^^^^^^^^^^^[0m
+[1;31mError[0m: Hooks can't be inside conditionals, neither loops.

@@ -278,14 +278,17 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
   let lintErrors =
     locations
     |> unique
-    |> List.map(loc =>
-         Driver.Lint_error.of_string(
-           loc,
+    |> List.iter(loc =>
+         raiseWithLoc(
+           ~loc,
            "Hooks can't be inside conditionals, neither loops.",
+           "",
          )
        );
 
-  lintOrder^ == true ? lintErrors : [];
+  lintOrder^ == true ? lintErrors : ();
+
+  structure;
 };
 
 let () =
@@ -304,7 +307,7 @@ let () =
 
 let () =
   Driver.register_transformation(
-    ~lint_impl=conditionalHooksLinter,
+    ~impl=conditionalHooksLinter,
     ~rules=[
       Context_free.Rule.special_function("React.useEffect", useEffectExpand),
       Context_free.Rule.special_function("useEffect", useEffectExpand),
