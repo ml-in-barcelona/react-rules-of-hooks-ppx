@@ -1,0 +1,21 @@
+let useMutation =
+    (~redirectSuccess=None, ~redirectCancel=None, ~onboarding=false, ()) => {
+  let variables =
+    makeVariables(
+      ~input={
+        "redirectSuccess": redirectSuccess,
+        "redirectCancel": redirectCancel,
+        "onboarding": onboarding,
+      },
+      (),
+    );
+
+  let (mutation, _, _) = ApolloHooks.useMutation(~variables, definition);
+
+  () => {
+    mutation()
+    ->Utils.Promise.map(fst)
+    ->Utils.Apollo.Mutation.trackResult(~analyticsMessage="Clicked")
+    ->ignore;
+  };
+};

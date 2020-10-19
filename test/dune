@@ -106,6 +106,33 @@
  )
 )
 
+; -------- Test: `HooksInsideHooks` --------
+(rule
+ (targets HooksInsideHooks.actual)
+ (deps
+  (:pp ../bin/Bin.exe)
+  (:input HooksInsideHooks.ml)
+ )
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stderr-to
+   %{targets}
+   (bash "! ./%{pp} %{input}")
+  )
+ )
+)
+
+(rule
+ (targets HooksInsideHooks.ml)
+ (deps HooksInsideHooks.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
 ; Compare the post-processed output to the .expected file
 (rule
  (alias runtest)
@@ -115,6 +142,7 @@
    (diff ConditionalHooks.expected ConditionalHooks.actual)
    (diff HooksAtTheTopLevel.expected HooksAtTheTopLevel.actual)
    (diff HooksAtTheTopLevel2.expected HooksAtTheTopLevel2.actual)
+   (diff HooksInsideHooks.expected HooksInsideHooks.actual)
   )
  )
 )

@@ -1,4 +1,4 @@
-[1mFile "HooksAtTheTopLevel.ml", line 1, characters 42-57[0m:
+File "HooksAtTheTopLevel.ml", line 1, characters 42-57:
 1 | let make () = ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())
-                                              [1;31m^^^^^^^^^^^^^^^[0m
-[1;31mError[0m: Hooks can't be inside conditionals, neither loops.
+                                              ^^^^^^^^^^^^^^^
+Error: Hooks can't be inside conditionals, neither loops.
