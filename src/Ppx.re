@@ -1,6 +1,7 @@
 open Ppxlib;
 
-/* Merlin_helpers.hide_expression */
+let lintExhaustiveDeps = ref(true);
+let lintOrder = ref(true);
 
 let raiseWithLoc = (~loc, msg, variables) =>
   Location.raise_errorf(~loc, msg, variables) |> ignore;
@@ -101,7 +102,7 @@ let getIdents = (expression: Parsetree.expression) => {
   getIdentsInner(expression, {ids: [], values: []});
 };
 
-let useEffectExpand = (e: Parsetree.expression) =>
+let useEffectLint = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
   | Pexp_apply(
       {
@@ -152,6 +153,13 @@ let useEffectExpand = (e: Parsetree.expression) =>
     };
     None;
   | _ => None
+  };
+
+let useEffectExpand = (e: Parsetree.expression) =>
+  if (lintExhaustiveDeps^ == true) {
+    useEffectLint(e);
+  } else {
+    None;
   };
 
 let startsWith = (affix, str) => {
@@ -267,15 +275,32 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
       {isInsideConditional: false, isInsideJSX: false, locations: []},
     );
 
-  locations
-  |> unique
-  |> List.map(loc =>
-       Driver.Lint_error.of_string(
-         loc,
-         "Hooks can't be inside conditionals, neither loops.",
-       )
-     );
+  let lintErrors =
+    locations
+    |> unique
+    |> List.map(loc =>
+         Driver.Lint_error.of_string(
+           loc,
+           "Hooks can't be inside conditionals, neither loops.",
+         )
+       );
+
+  lintOrder^ == true ? lintErrors : [];
 };
+
+let () =
+  Driver.add_arg(
+    "-exhaustive-deps",
+    Set(lintExhaustiveDeps),
+    ~doc="If set, checks for 'exhaustive dependencies' in UseEffects",
+  );
+
+let () =
+  Driver.add_arg(
+    "-order-of-hooks",
+    Set(lintOrder),
+    ~doc="If set, checks for hooks being called at the top level",
+  );
 
 let () =
   Driver.register_transformation(

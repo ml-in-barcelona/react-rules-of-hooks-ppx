@@ -3,8 +3,8 @@
 This ppx validates the rules of React hooks:
 
 - [x] Exhaustive dependencies in useEffect
+- [x] Only Call Hooks at the Top Level
 - [x] Hooks shoudn't be called in different order
-- [] Only Call Hooks at the Top Level
 
 Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
 
