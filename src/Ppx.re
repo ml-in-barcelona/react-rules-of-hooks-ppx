@@ -213,6 +213,7 @@ let findConditionalHooks = {
           when isAHook(lident) && acc.isInsideJSX => {
           ...acc,
           locations: [t.pexp_loc, ...acc.locations],
+          isInsideJSX: false,
         }
       | Pexp_sequence(_, exp) =>
         let acc =

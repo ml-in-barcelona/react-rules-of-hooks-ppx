@@ -1,7 +1,6 @@
 [@react.component]
 let make = () => {
-  useEffect();
-  useEffect();
+  let (state, setState) = React.useState();
 
   <div onClick={_evt => useMouseHook()} />;
 };
