@@ -8,14 +8,14 @@ enforce the rules of React hooks.
 
 Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
 
-### Why
+## Why
 One of the points of using [Reason](https://reasonml.github.io) or [ReScript](https://rescript-lang.org) is to have a compiler that warns about issues with your code, where functions expect different structures from the given ones and any sort of missmatch between interfaces. This works amazingly well, but I found a case where the compiler can't validate that your code works as expected.
 
 Using ReasonReact and writting hooks, which have certain rules that aren't catchable by the compiler. Not following one of the rules, might cause some unexpected bug or a run-time error.
 
 This package solves this problem, brings those run-time errors to compile errors.
 
-### Install
+## Install
 ```bash
 npm install react-rules-of-hooks-ppx --save-dev
 # or
@@ -29,10 +29,10 @@ Add the ppx on the BuckleScript config (`bsconfig.json`)
 ]
 ```
 
-### Issues
+## Issues
 Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
 
-### Demo
+## Demo
 Here we have a dummy react component:
 ```re
 [@react.component]
@@ -73,5 +73,5 @@ Produces the following error:
 Error: ExhaustiveDeps: Missing 'randomProp' in the dependency array
 ```
 
-### Acknowledgements
+## Acknowledgements
 Thanks to [@jchavarri](https://github.com/jchavarri)
