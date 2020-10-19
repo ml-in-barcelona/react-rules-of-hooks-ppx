@@ -1,12 +1,19 @@
 # react-rules-of-hooks-ppx
-
-This ppx validates the rules of React hooks:
+This package is a no-op ppx rewriter. It is used as a 'lint' to
+enforce the rules of React hooks.
 
 - [x] Exhaustive dependencies in useEffect
 - [x] Only Call Hooks at the Top Level
 - [x] Hooks shoudn't be called in different order
 
 Read more about the [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
+
+### Why
+One of the points of using [Reason](https://reasonml.github.io) or [ReScript](https://rescript-lang.org) is to have a compiler that warns about issues with your code, where functions expect different structures from the given ones and any sort of missmatch between interfaces. This works amazingly well, but I found a case where the compiler can't validate that your code works as expected.
+
+Using ReasonReact and writting hooks, which have certain rules that aren't catchable by the compiler. Not following one of the rules, might cause some unexpected bug or a run-time error.
+
+This package solves this problem, brings those run-time errors to compile errors.
 
 ### Install
 ```bash
@@ -22,8 +29,10 @@ Add the ppx on the BuckleScript config (`bsconfig.json`)
 ]
 ```
 
-### Demo
+### Issues
+Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
 
+### Demo
 Here we have a dummy react component:
 ```re
 [@react.component]
@@ -63,10 +72,6 @@ Produces the following error:
 
 Error: ExhaustiveDeps: Missing 'randomProp' in the dependency array
 ```
-
-### Issues
-
-This ppx is in an early stage ⚠️. Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
 
 ### Acknowledgements
 Thanks to [@jchavarri](https://github.com/jchavarri)
