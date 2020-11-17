@@ -9,22 +9,6 @@ module GQL = {
       ->Utils.Apollo.Mutation.trackResult(
           ~analyticsMessage=
             onboarding ? "Clicked Pro Plan" : "Clicked Manage Billing",
-          ~onData=
-            data =>
-              switch (
-                data##createCheckoutOrBillingPortalSession##checkoutSessionId,
-                data##createCheckoutOrBillingPortalSession##billingPortalSessionUrl,
-              ) {
-              | (Some(checkoutSessionId), None) =>
-                Stripe.redirectToCheckout(checkoutSessionId)
-              | (None, Some(billingPortalSessionUrl)) =>
-                Utils.setLocationUrl(billingPortalSessionUrl)
-              | _ =>
-                Js.Exn.raiseError(
-                  "Exactly one of checkoutSessionId or billingPortalSessionUrl must be defined (not both)",
-                )
-              },
-          (),
         )
       ->ignore;
     };
