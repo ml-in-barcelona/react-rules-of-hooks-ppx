@@ -3,15 +3,11 @@
   (modules Bin)
   (public_name react-rules-of-hooks-ppx)
   (libraries ReactRulesOfHooksPpx.lib)
-  (ocamlopt_flags (-linkall))
   (package ReactRulesOfHooksPpx)
 )
 
 (executable
   (name Standalone)
   (modules Standalone)
-  (public_name react-rules-of-hooks-ppx)
   (libraries ReactRulesOfHooksPpx.lib)
-  (ocamlopt_flags (-linkall))
-  (package ReactRulesOfHooksPpx)
 )
