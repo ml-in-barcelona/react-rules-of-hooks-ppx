@@ -1,4 +1,4 @@
-[1mFile "ConditionalHooks.ml", line 3, characters 32-47[0m:
-3 |   if randomProp == "state" then useMouseHook ();
-                                    [1;31m^^^^^^^^^^^^^^^[0m
+[1mFile "ConditionalHooks.ml", line 4, characters 9-54[0m:
+4 |     then ((useMouseHook ())[@reason.preserve_braces ]);
+             [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
 [1;31mError[0m: Hooks can't be inside conditionals, neither loops.

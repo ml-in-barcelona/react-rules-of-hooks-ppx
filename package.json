@@ -1,7 +1,7 @@
 {
   "name": "react-rules-of-hooks-ppx",
-  "version": "0.8.1",
-  "description": "This ppx validates the rules of React hooks",
+  "version": "0.9.0",
+  "description": "ppx validates the rules of React hooks",
   "author": "davesnx <dsnxmoreno@gmail.com>",
   "keywords": [
     "reason",
@@ -10,7 +10,9 @@
     "bucklescript",
     "rescript",
     "react",
-    "hooks"
+    "hooks",
+    "ppx",
+    "reason-react"
   ],
   "esy": {
     "buildsInSource": "_build",
@@ -36,25 +38,18 @@
     }
   },
   "devDependencies": {
-    "@opam/merlin": "*",
-    "ocaml": "4.10.0",
-    "@esy-ocaml/reason": ">= 3.6.0 < 4.0.0",
-    "@opam/dune": "2.7.1",
-    "@opam/ocaml-migrate-parsetree": "^1.7.3",
-    "@opam/ppxlib": "0.14.0",
+    "ocaml": "~4.10.0",
+    "@esy-ocaml/reason": "^3.6.2",
+    "@opam/dune": "2.8.4",
+    "@opam/ppxlib": "0.22.0",
     "@reason-native/rely": "^3.2.1",
-    "@opam/ocaml-lsp-server": "ocaml/ocaml-lsp:ocaml-lsp-server.opam#fbc433e14035d520c7137916ae710b8ec3b415e9"
-  },
-  "resolutions": {
-    "@esy-ocaml/reason": "facebook/reason:reason.json#773dbcd"
+    "@opam/ocaml-lsp-server": "1.4.1"
   },
   "scripts": {
     "build": "esy dune build -p ReactRulesOfHooksPpx",
     "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
     "test": "esy b dune runtest",
     "promote": "esy dune promote",
-    "doc": "esy dune build @doc",
-    "doc-path": "esy echo #{self.target_dir}/default/_doc/_html/index.html",
     "format": "esy dune build @fmt --auto-promote",
     "utop": "esy dune utop lib -- -implicit-bindings"
   }
