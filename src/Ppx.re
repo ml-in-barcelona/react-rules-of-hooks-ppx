@@ -171,7 +171,6 @@ let startsWith = (affix, str) => {
 
 type acc = {
   isInsideConditional: bool,
-  isInsideJSX: bool,
   locations: list(Location.t),
 };
 
@@ -189,26 +188,10 @@ let findConditionalHooks = {
     startsWith("use", name);
   };
 
-  let containsJSX = (attrs: attributes) => {
-    let someAttrIsJsx =
-      List.find_opt(({attr_name, _}) => attr_name.txt == "JSX", attrs);
-
-    Option.is_some(someAttrIsJsx);
-  };
-
   let linter = {
     as _;
     inherit class Ast_traverse.fold(acc) as super;
     pub! expression = (t, acc) => {
-      let acc =
-        super#expression(
-          t,
-          {
-            ...acc,
-            isInsideJSX: acc.isInsideJSX || containsJSX(t.pexp_attributes),
-          },
-        );
-
       switch (t.pexp_desc) {
       | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _}), _}, _args)
           when isAHook(lident) && acc.isInsideConditional => {
@@ -216,19 +199,10 @@ let findConditionalHooks = {
           locations: [t.pexp_loc, ...acc.locations],
         }
       | Pexp_apply({pexp_desc: Pexp_ident({txt: lident, _}), _}, _args)
-          when isAHook(lident) && acc.isInsideJSX => {
+          when isAHook(lident) => {
           ...acc,
           locations: [t.pexp_loc, ...acc.locations],
-          isInsideJSX: false,
         }
-      | Pexp_sequence(_, exp) =>
-        let acc =
-          super#expression(
-            exp,
-            {...acc, isInsideJSX: containsJSX(exp.pexp_attributes)},
-          );
-
-        acc;
       | Pexp_match(_expr, listOfExpr) =>
         List.fold_left(
           (acc, expr) =>
@@ -270,7 +244,7 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
   let {locations, _} =
     findConditionalHooks(
       structure,
-      {isInsideConditional: false, isInsideJSX: false, locations: []},
+      {isInsideConditional: false, locations: []},
     );
 
   let lintErrors =

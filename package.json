@@ -48,7 +48,7 @@
   "scripts": {
     "build": "esy dune build -p ReactRulesOfHooksPpx",
     "watch": "esy dune build -p ReactRulesOfHooksPpx --watch",
-    "test": "esy b dune runtest",
+    "test": "esy b dune runtest --force",
     "promote": "esy dune promote",
     "format": "esy dune build @fmt --auto-promote",
     "utop": "esy dune utop lib -- -implicit-bindings"
