@@ -1,4 +1,4 @@
-[1mFile "HooksAtTheTopLevel2.ml", line 3, characters 30-45[0m:
-3 |   ((div ~onClick:(fun _evt -> useMouseHook ()) ~children:[] ())[@JSX ])
-                                  [1;31m^^^^^^^^^^^^^^^[0m
+[1mFile "HooksAtTheTopLevel2.ml", line 3, characters 33-48[0m:
+3 |     ((div ~onClick:((fun _evt -> useMouseHook ())[@reason.preserve_braces ])
+                                     [1;31m^^^^^^^^^^^^^^^[0m
 [1;31mError[0m: Hooks can't be inside conditionals, neither loops.

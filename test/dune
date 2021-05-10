@@ -2,7 +2,7 @@
 (rule
  (targets ExhaustiveDepsUseEffect.actual)
  (deps
-  (:pp ../bin/Bin.exe)
+  (:pp ../bin/Standalone.exe)
   (:input ExhaustiveDepsUseEffect.ml)
  )
  (action
@@ -29,7 +29,7 @@
 (rule
  (targets ConditionalHooks.actual)
  (deps
-  (:pp ../bin/Bin.exe)
+  (:pp ../bin/Standalone.exe)
   (:input ConditionalHooks.ml)
  )
  (action
@@ -56,7 +56,7 @@
 (rule
  (targets HooksAtTheTopLevel.actual)
  (deps
-  (:pp ../bin/Bin.exe)
+  (:pp ../bin/Standalone.exe)
   (:input HooksAtTheTopLevel.ml)
  )
  (action
@@ -83,7 +83,7 @@
 (rule
  (targets HooksAtTheTopLevel2.actual)
  (deps
-  (:pp ../bin/Bin.exe)
+  (:pp ../bin/Standalone.exe)
   (:input HooksAtTheTopLevel2.ml)
  )
  (action

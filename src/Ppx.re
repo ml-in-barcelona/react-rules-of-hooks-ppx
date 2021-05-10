@@ -1,7 +1,7 @@
 open Ppxlib;
 
-let lintExhaustiveDeps = ref(true);
-let lintOrder = ref(true);
+let exhaustiveDeps = ref(true);
+let orderOfHooks = ref(true);
 
 let raiseWithLoc = (~loc, msg, variables) =>
   Location.raise_errorf(~loc, msg, variables) |> ignore;
@@ -106,10 +106,8 @@ let useEffectLint = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
   | Pexp_apply(
       {
-        pexp_desc: Pexp_ident({loc: _loc, txt: _, _}),
-        pexp_loc: _,
-        pexp_attributes: _,
-        pexp_loc_stack: _,
+        pexp_desc: Pexp_ident(_),
+        _,
       },
       args,
     ) =>
@@ -156,7 +154,7 @@ let useEffectLint = (e: Parsetree.expression) =>
   };
 
 let useEffectExpand = (e: Parsetree.expression) =>
-  if (lintExhaustiveDeps^ == true) {
+  if (exhaustiveDeps^ == true) {
     useEffectLint(e);
   } else {
     None;
@@ -286,7 +284,7 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
          )
        );
 
-  lintOrder^ == true ? lintErrors : ();
+  orderOfHooks^ == true ? lintErrors : ();
 
   structure;
 };
@@ -294,14 +292,14 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
 let () =
   Driver.add_arg(
     "-exhaustive-deps",
-    Set(lintExhaustiveDeps),
+    Set(exhaustiveDeps),
     ~doc="If set, checks for 'exhaustive dependencies' in UseEffects",
   );
 
 let () =
   Driver.add_arg(
-    "-order-of-hooks",
-    Set(lintOrder),
+    "-orderOfHooks-of-hooks",
+    Set(orderOfHooks),
     ~doc="If set, checks for hooks being called at the top level",
   );
 
@@ -309,6 +307,7 @@ let () =
   Driver.register_transformation(
     ~impl=conditionalHooksLinter,
     ~rules=[
+      /* useEffect */
       Context_free.Rule.special_function("React.useEffect", useEffectExpand),
       Context_free.Rule.special_function("useEffect", useEffectExpand),
       Context_free.Rule.special_function("React.useEffect1", useEffectExpand),

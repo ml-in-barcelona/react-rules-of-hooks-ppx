@@ -3,5 +3,5 @@
  (wrapped false)
  (public_name ReactRulesOfHooksPpx.lib)
  (kind ppx_rewriter)
- (libraries ocaml-migrate-parsetree ppxlib)
+ (libraries ppxlib)
 )
