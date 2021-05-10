@@ -1,6 +1,6 @@
 {
   "name": "react-rules-of-hooks-ppx",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "ppx validates the rules of React hooks",
   "author": "davesnx <dsnxmoreno@gmail.com>",
   "keywords": [
