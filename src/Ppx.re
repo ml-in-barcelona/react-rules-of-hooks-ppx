@@ -104,13 +104,7 @@ let getIdents = (expression: Parsetree.expression) => {
 
 let useEffectLint = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
-  | Pexp_apply(
-      {
-        pexp_desc: Pexp_ident(_),
-        _,
-      },
-      args,
-    ) =>
+  | Pexp_apply({pexp_desc: Pexp_ident(_), _}, args) =>
     {
       let bodyExpression =
         switch (List.nth_opt(args, 0)) {
@@ -293,14 +287,16 @@ let () =
   Driver.add_arg(
     "-disable-exhaustive-deps",
     Clear(exhaustiveDeps),
-    ~doc="If set, disables the checks for 'exhaustive dependencies' in UseEffect/UseEffectLayout",
+    ~doc=
+      "If set, disables the checks for 'exhaustive dependencies' in UseEffect/UseEffectLayout",
   );
 
 let () =
   Driver.add_arg(
     "-disable-order-of-hooks",
     Clear(orderOfHooks),
-    ~doc="If set, disables the checks for hooks being called at the top level and not conditionally",
+    ~doc=
+      "If set, disables the checks for hooks being called at the top level and not conditionally",
   );
 
 let () =

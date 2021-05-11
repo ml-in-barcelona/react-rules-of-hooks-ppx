@@ -1,4 +1,0 @@
-[1mFile "HooksAtTheTopLevel.ml", line 2, characters 31-46[0m:
-2 |   ((div ~onClick:((fun _evt -> useMouseHook ())[@reason.preserve_braces ])
-                                   [1;31m^^^^^^^^^^^^^^^[0m
-[1;31mError[0m: Hooks can't be inside conditionals, neither loops.

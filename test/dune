@@ -1,140 +1,22 @@
 ; -------- Test: `ExhaustiveDeps` --------
-(rule
- (targets ExhaustiveDepsUseEffect.actual)
- (deps
-  (:pp ../bin/Standalone.exe)
-  (:input ExhaustiveDepsUseEffect.ml)
- )
- (action
-  ; expect the process to fail, capturing stderr
-  (with-stdout-to %{targets}
-   ; expect the process to fail, capturing stderr
-   (with-stderr-to %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
- )
-)
 
 (rule
- (targets ExhaustiveDepsUseEffect.ml)
- (deps ExhaustiveDepsUseEffect.re)
+ (targets InvalidRuleExhaustiveDeps.actual)
+ (deps
+  (:pp ../bin/Standalone.exe)
+  (:input InvalidRuleExhaustiveDeps.ml))
  (action
+  ; expect the process to fail, capturing stderr
   (with-stdout-to
    %{targets}
-   (run refmt --parse=re --print=ml %{deps})
-  )
- )
-)
-
-; -------- Test: `CustomHooks` --------
-(rule
- (targets CustomHooks.actual)
- (deps
-  (:pp ../bin/Standalone.exe)
-  (:input CustomHooks.ml)
- )
- (action
-  ; expect the process to fail, capturing stderr
-  (with-stdout-to %{targets}
    ; expect the process to fail, capturing stderr
-   (with-stderr-to %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
- )
-)
+   (with-stderr-to
+    %{targets}
+    (bash "! ./%{pp} %{input}")))))
 
 (rule
- (targets CustomHooks.ml)
- (deps CustomHooks.re)
- (action
-  (with-stdout-to
-   %{targets}
-   (run refmt --parse=re --print=ml %{deps})
-  )
- )
-)
-
-; -------- Test: `ConditionalHooks` --------
-(rule
- (targets ConditionalHooks.actual)
- (deps
-  (:pp ../bin/Standalone.exe)
-  (:input ConditionalHooks.ml)
- )
- (action
-  ; expect the process to fail, capturing stderr
-  (with-stdout-to %{targets}
-   ; expect the process to fail, capturing stderr
-   (with-stderr-to %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
- )
-)
-
-(rule
- (targets ConditionalHooks.ml)
- (deps ConditionalHooks.re)
- (action
-  (with-stdout-to
-   %{targets}
-   (run refmt --parse=re --print=ml %{deps})
-  )
- )
-)
-
-; -------- Test: `HooksAtTheTopLevel` --------
-(rule
- (targets HooksAtTheTopLevel.actual)
- (deps
-  (:pp ../bin/Standalone.exe)
-  (:input HooksAtTheTopLevel.ml)
- )
- (action
-  ; expect the process to fail, capturing stderr
-  (with-stdout-to %{targets}
-   ; expect the process to fail, capturing stderr
-   (with-stderr-to %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
- )
-)
-
-(rule
- (targets HooksAtTheTopLevel.ml)
- (deps HooksAtTheTopLevel.re)
- (action
-  (with-stdout-to
-   %{targets}
-   (run refmt --parse=re --print=ml %{deps})
-  )
- )
-)
-
-; -------- Test: `HooksAtTheTopLevel2` --------
-(rule
- (targets HooksAtTheTopLevel2.actual)
- (deps
-  (:pp ../bin/Standalone.exe)
-  (:input HooksAtTheTopLevel2.ml)
- )
- (action
-  ; expect the process to fail, capturing stderr
-  (with-stdout-to %{targets}
-   ; expect the process to fail, capturing stderr
-   (with-stderr-to %{targets}
-    (bash "! ./%{pp} %{input}")
-   )
-  )
- )
-)
-
-(rule
- (targets HooksAtTheTopLevel2.ml)
- (deps HooksAtTheTopLevel2.re)
+ (targets InvalidRuleExhaustiveDeps.ml)
+ (deps InvalidRuleExhaustiveDeps.re)
  (action
   (with-stdout-to
    %{targets}
@@ -148,11 +30,7 @@
  (alias runtest)
  (action
   (progn
-   (diff CustomHooks.expected CustomHooks.actual)
-   (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
-   (diff ConditionalHooks.expected ConditionalHooks.actual)
-   (diff HooksAtTheTopLevel.expected HooksAtTheTopLevel.actual)
-   (diff HooksAtTheTopLevel2.expected HooksAtTheTopLevel2.actual)
+   (diff InvalidRuleExhaustiveDeps.expected InvalidRuleExhaustiveDeps.actual)
   )
  )
 )

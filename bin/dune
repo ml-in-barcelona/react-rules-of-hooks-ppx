@@ -1,13 +1,13 @@
 (executable
-  (name Bin)
-  (modules Bin)
-  (public_name react-rules-of-hooks-ppx)
-  (libraries ReactRulesOfHooksPpx.lib)
-  (package ReactRulesOfHooksPpx)
+ (name Bin)
+ (modules Bin)
+ (public_name react-rules-of-hooks-ppx)
+ (libraries ReactRulesOfHooksPpx.lib)
+ (package ReactRulesOfHooksPpx)
 )
 
 (executable
-  (name Standalone)
-  (modules Standalone)
-  (libraries ReactRulesOfHooksPpx.lib)
+ (name Standalone)
+ (modules Standalone)
+ (libraries ReactRulesOfHooksPpx.lib)
 )
