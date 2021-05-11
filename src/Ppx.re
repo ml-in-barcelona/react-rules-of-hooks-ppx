@@ -25,7 +25,8 @@ let getIdents = (expression: Parsetree.expression) => {
   let rec getIdentsInner = (expression: Parsetree.expression, meta: meta) => {
     let pushIdentList = exprs => {
       let newIds =
-        List.concat_map(expr => [getIdentsInner(expr, meta)], exprs)
+        exprs
+        |> List.map(expr => getIdentsInner(expr, meta))
         |> List.concat_map(meta => meta.ids);
 
       {...meta, ids: List.append(meta.ids, newIds)};
@@ -299,27 +300,26 @@ let () =
       "If set, disables the checks for hooks being called at the top level and not conditionally",
   );
 
-let () =
-  Driver.register_transformation(
-    ~impl=conditionalHooksLinter,
-    ~rules=[
-      /* useEffect */
-      Context_free.Rule.special_function("React.useEffect", useEffectExpand),
-      Context_free.Rule.special_function("useEffect", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect1", useEffectExpand),
-      Context_free.Rule.special_function("useEffect1", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect2", useEffectExpand),
-      Context_free.Rule.special_function("useEffect2", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect3", useEffectExpand),
-      Context_free.Rule.special_function("useEffect3", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect4", useEffectExpand),
-      Context_free.Rule.special_function("useEffect4", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect5", useEffectExpand),
-      Context_free.Rule.special_function("useEffect5", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect6", useEffectExpand),
-      Context_free.Rule.special_function("useEffect6", useEffectExpand),
-      Context_free.Rule.special_function("React.useEffect7", useEffectExpand),
-      Context_free.Rule.special_function("useEffect7", useEffectExpand),
-    ],
-    "react-rules-of-hooks",
-  );
+Driver.register_transformation(
+  ~impl=conditionalHooksLinter,
+  ~rules=[
+    /* useEffect */
+    Context_free.Rule.special_function("React.useEffect", useEffectExpand),
+    Context_free.Rule.special_function("useEffect", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect1", useEffectExpand),
+    Context_free.Rule.special_function("useEffect1", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect2", useEffectExpand),
+    Context_free.Rule.special_function("useEffect2", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect3", useEffectExpand),
+    Context_free.Rule.special_function("useEffect3", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect4", useEffectExpand),
+    Context_free.Rule.special_function("useEffect4", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect5", useEffectExpand),
+    Context_free.Rule.special_function("useEffect5", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect6", useEffectExpand),
+    Context_free.Rule.special_function("useEffect6", useEffectExpand),
+    Context_free.Rule.special_function("React.useEffect7", useEffectExpand),
+    Context_free.Rule.special_function("useEffect7", useEffectExpand),
+  ],
+  "react-rules-of-hooks",
+);
