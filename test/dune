@@ -7,9 +7,11 @@
  )
  (action
   ; expect the process to fail, capturing stderr
-  (with-stderr-to
-   %{targets}
-   (bash "! ./%{pp} %{input}")
+  (with-stdout-to %{targets}
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
   )
  )
 )
@@ -17,6 +19,35 @@
 (rule
  (targets ExhaustiveDepsUseEffect.ml)
  (deps ExhaustiveDepsUseEffect.re)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run refmt --parse=re --print=ml %{deps})
+  )
+ )
+)
+
+; -------- Test: `CustomHooks` --------
+(rule
+ (targets CustomHooks.actual)
+ (deps
+  (:pp ../bin/Standalone.exe)
+  (:input CustomHooks.ml)
+ )
+ (action
+  ; expect the process to fail, capturing stderr
+  (with-stdout-to %{targets}
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
+  )
+ )
+)
+
+(rule
+ (targets CustomHooks.ml)
+ (deps CustomHooks.re)
  (action
   (with-stdout-to
    %{targets}
@@ -34,9 +65,11 @@
  )
  (action
   ; expect the process to fail, capturing stderr
-  (with-stderr-to
-   %{targets}
-   (bash "! ./%{pp} %{input}")
+  (with-stdout-to %{targets}
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
   )
  )
 )
@@ -61,9 +94,11 @@
  )
  (action
   ; expect the process to fail, capturing stderr
-  (with-stderr-to
-   %{targets}
-   (bash "! ./%{pp} %{input}")
+  (with-stdout-to %{targets}
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
   )
  )
 )
@@ -88,9 +123,11 @@
  )
  (action
   ; expect the process to fail, capturing stderr
-  (with-stderr-to
-   %{targets}
-   (bash "! ./%{pp} %{input}")
+  (with-stdout-to %{targets}
+   ; expect the process to fail, capturing stderr
+   (with-stderr-to %{targets}
+    (bash "! ./%{pp} %{input}")
+   )
   )
  )
 )
@@ -111,6 +148,7 @@
  (alias runtest)
  (action
   (progn
+   (diff CustomHooks.expected CustomHooks.actual)
    (diff ExhaustiveDepsUseEffect.expected ExhaustiveDepsUseEffect.actual)
    (diff ConditionalHooks.expected ConditionalHooks.actual)
    (diff HooksAtTheTopLevel.expected HooksAtTheTopLevel.actual)

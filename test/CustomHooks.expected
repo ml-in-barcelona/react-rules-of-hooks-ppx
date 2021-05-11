@@ -1,0 +1,4 @@
+[1mFile "CustomHooks.ml", line 3, characters 29-58[0m:
+3 |     then (((let elementRef = React.useRef Js.Nullable.null in ()))
+                                 [1;31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+[1;31mError[0m: Hooks can't be inside conditionals, neither loops.
