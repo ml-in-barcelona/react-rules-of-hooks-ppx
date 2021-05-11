@@ -291,16 +291,16 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
 
 let () =
   Driver.add_arg(
-    "-exhaustive-deps",
-    Set(exhaustiveDeps),
-    ~doc="If set, checks for 'exhaustive dependencies' in UseEffects",
+    "-disable-exhaustive-deps",
+    Clear(exhaustiveDeps),
+    ~doc="If set, disables the checks for 'exhaustive dependencies' in UseEffect/UseEffectLayout",
   );
 
 let () =
   Driver.add_arg(
-    "-orderOfHooks-of-hooks",
-    Set(orderOfHooks),
-    ~doc="If set, checks for hooks being called at the top level",
+    "-disable-order-of-hooks",
+    Clear(orderOfHooks),
+    ~doc="If set, disables the checks for hooks being called at the top level and not conditionally",
   );
 
 let () =
