@@ -14,7 +14,7 @@ let rec unique = lst =>
   | [h, ...t] => [h, ...unique(List.filter(x => x != h, t))]
   };
 
-let quotes = str => "'" ++ str ++ "'";
+let quotes = Printf.sprintf("'%s'");
 
 type meta = {
   ids: list(longident), /* List of identifiers */
@@ -104,13 +104,7 @@ let getIdents = (expression: Parsetree.expression) => {
 
 let useEffectLint = (e: Parsetree.expression) =>
   switch (e.pexp_desc) {
-  | Pexp_apply(
-      {
-        pexp_desc: Pexp_ident(_),
-        _,
-      },
-      args,
-    ) =>
+  | Pexp_apply({pexp_desc: Pexp_ident(_), _}, args) =>
     {
       let bodyExpression =
         switch (List.nth_opt(args, 0)) {
@@ -190,10 +184,9 @@ let findConditionalHooks = {
   };
 
   let containsJSX = (attrs: attributes) => {
-    let someAttrIsJsx =
-      List.find_opt(({attr_name, _}) => attr_name.txt == "JSX", attrs);
-
-    Option.is_some(someAttrIsJsx);
+    attrs
+    |> List.find_opt(({attr_name, _}) => attr_name.txt == "JSX")
+    |> Option.is_some;
   };
 
   let linter = {
@@ -243,8 +236,7 @@ let findConditionalHooks = {
         super#expression(expr, {...acc, isInsideConditional: true})
       | Pexp_for(_, _, _, _, expr) =>
         super#expression(expr, {...acc, isInsideConditional: true})
-      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr)
-          when !acc.isInsideConditional =>
+      | Pexp_ifthenelse(ifExpr, thenExpr, elseExpr) =>
         let acc =
           super#expression(ifExpr, {...acc, isInsideConditional: true});
         let acc =
@@ -277,11 +269,7 @@ let conditionalHooksLinter = (structure: Parsetree.structure) => {
     locations
     |> unique
     |> List.iter(loc =>
-         raiseWithLoc(
-           ~loc,
-           "Hooks can't be inside conditionals, neither loops.",
-           "",
-         )
+         raiseWithLoc(~loc, "Hooks can't be called conditionally", "")
        );
 
   orderOfHooks^ == true ? lintErrors : ();
@@ -298,7 +286,7 @@ let () =
 
 let () =
   Driver.add_arg(
-    "-orderOfHooks-of-hooks",
+    "-order-of-hooks",
     Set(orderOfHooks),
     ~doc="If set, checks for hooks being called at the top level",
   );
