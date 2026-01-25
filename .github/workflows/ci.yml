@@ -3,178 +3,72 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
     tags:
-      - v*
+      - '*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  DUNE_PROFILE: release
+  OCAMLRUNPARAM: b
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash -xeuo pipefail {0}
 
 jobs:
-  build-test:
+  build:
+    name: Build and test
+
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v1
-        with:
-          node-version: 12
-      - name: Install esy
-        run: npm install -g esy@0.6.7
+        os:
+          - macos-latest
+          - ubuntu-latest
+        ocaml-compiler:
+          - 4.14.2
+          - 5.4.0
 
-      - name: Try to restore install cache
-        uses: actions/cache@v2
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v3
         with:
-          path: ~/.esy/source
-          key: source-${{ matrix.os }}-${{ hashFiles('**/index.json') }}
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
 
       - name: Install dependencies
-        run: esy install
+        run: make install
 
-      - name: Print esy cache
-        id: print_esy_cache
-        run: node .github/workflows/print-esy-cache.js
+      - name: Build
+        run: make build
 
-      - name: Try to restore dependencies cache
-        id: deps-cache
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.print_esy_cache.outputs.esy_cache }}
-          key: build-${{ matrix.os }}-${{ hashFiles('**/index.json') }}
-          restore-keys: build-${{ matrix.os }}-
-
-      - name: Build dependencies
-        if: steps.deps-cache.outputs.cache-hit != 'true'
-        run: esy build-dependencies
-
-      - name: Build project
-        run: esy build
+      - name: Check formatting
+        run: make format-check
 
       - name: Run tests
-        run: |
-          cat _build/default/test/ExhaustiveDepsUseEffect.expected
-          echo "--------------------"
-          # esy test
-        env:
-          OCAML_ERROR_STYLE: "short"
-          OCAML_COLOR: "never"
+        run: make test
 
-      - uses: actions/upload-artifact@v2
+      - name: Install dune-release
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.4.0'
+        run: opam install dune-release -y
+
+      - name: Release
+        uses: davesnx/dune-release-action@v0.2.14
+        if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.4.0'
         with:
-          name: ${{ matrix.os }}
-          path: _build/default/bin/Bin.exe
-
-      # Cleanup build cache if dependencies have changed
-      - name: Clean build cache
-        if: steps.deps-cache.outputs.cache-hit != 'true'
-        run: esy cleanup .
-
-  prepare-publish:
-    name: Prepare publish to npm
-    needs: build-test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/setup-node@v1
-        with:
-          node-version: 12
-      - uses: actions/checkout@v2
-
-      # Download platform artifacts
-      - name: Download Linux release
-        uses: actions/download-artifact@v2
-        with:
-          name: ubuntu-latest
-          path: ubuntu-latest
-      - name: Download Windows release
-        uses: actions/download-artifact@v2
-        with:
-          name: windows-latest
-          path: windows-latest
-      - name: Download macOS release
-        uses: actions/download-artifact@v2
-        with:
-          name: macos-latest
-          path: macos-latest
-      # Move artifacts in place
-      - name: Move artifacts
-        run: |
-          mkdir -p _release/platform-linux
-          mkdir -p _release/platform-windows-x64
-          mkdir -p _release/platform-darwin
-          cp -a ubuntu-latest/. _release/platform-linux
-          cp -a windows-latest/. _release/platform-windows-x64
-          cp -a macos-latest/. _release/platform-darwin
-      - name: Prepare package
-        run: node .github/workflows/release.js
-      # Create a npm package that can easily be published and tested
-      - name: npm pack
-        run: npm pack .
-        working-directory: _release
-      - name: move package
-        run: mv _release/*.tgz react-rules-of-hooks-ppx.tgz
-      # Upload artifacts
-      - uses: actions/upload-artifact@v2
-        with:
-          name: release
-          path: _release/
-      - uses: actions/upload-artifact@v2
-        with:
-          name: release-tarball
-          path: react-rules-of-hooks-ppx.tgz
-
-  publish:
-    needs: prepare-publish
-    name: (only on release) Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Use Node.js 12.x
-        uses: actions/setup-node@v1
-        with:
-          node-version: 12.x
-
-      - name: Print short SHA
-        id: sha
-        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
-
-      - name: Download release
-        uses: actions/download-artifact@v2
-        with:
-          name: release
-          path: release
-
-      - name: Zip release folder
-        run: zip -r release.zip release
-
-      - name: Create GitHub release
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          tag_name: ${{ steps.sha.outputs.sha_short }}
-          release_name: Release ${{ steps.sha.outputs.sha_short }}
-          draft: false
-          prerelease: false
-
-      - name: Upload ubuntu-latest to Github release
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release.zip
-          asset_name: release.zip
-          asset_content_type: application/gzip
-
-      - name: Release NPM package
-        if: "startsWith(github.ref, 'refs/tags/v')"
-        run: |
-          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
-          npm publish --access public
-        working-directory: ./release
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          packages: react-rules-of-hooks-ppx
+          changelog: ./CHANGES.md
+          github-token: ${{ secrets.GH_TOKEN }}

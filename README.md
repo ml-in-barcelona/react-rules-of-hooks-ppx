@@ -25,35 +25,25 @@ It's a proof of concept on re-creating the ESLint plugin, and it's very restrict
 ## Install
 
 ```bash
-npm install react-rules-of-hooks-ppx --save-dev
-# or
-yarn add react-rules-of-hooks-ppx --dev
+opam install react-rules-of-hooks-ppx --save-dev
 ```
 
 Add the ppx on the BuckleScript config (`bsconfig.json`)
 
-```json
-"ppx-flags": [
-  "react-rules-of-hooks-ppx/Bin.exe"
-]
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx))
 ```
-
-You can disable globally both rules passing parameters to the ppx:
 
 ### Disable "Exhaustive dependencies in useEffect"
 
-```json
-"ppx-flags": [
-  ["react-rules-of-hooks-ppx/Bin.exe", "-exhaustive-deps"]
-]
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx -exhaustive-deps))
 ```
 
 ### Disable "Order of Hooks"
 
-```json
-"ppx-flags": [
-  ["react-rules-of-hooks-ppx/Bin.exe", "-order-of-hooks"]
-]
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx -order-of-hooks))
 ```
 
 ## Issues

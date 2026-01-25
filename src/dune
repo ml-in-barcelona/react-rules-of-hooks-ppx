@@ -1,7 +1,11 @@
 (library
- (name ReactRulesOfHooksPpx)
- (wrapped false)
- (public_name ReactRulesOfHooksPpx.lib)
+ (name react_rules_of_hooks_ppx)
+ (public_name react-rules-of-hooks-ppx)
+ (modules ppx)
  (kind ppx_rewriter)
- (libraries ppxlib)
-)
+ (libraries ppxlib))
+
+(executable
+ (name standalone)
+ (modules standalone)
+ (libraries react_rules_of_hooks_ppx ppxlib))

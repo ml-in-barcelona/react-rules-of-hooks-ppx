@@ -1,0 +1,22 @@
+This test showcases that multiple errors can be reported at once
+(instead of stopping at the first one when using raise_errorf)
+
+  $ cat > input.ml << 'EOF'
+  > let useMouseHook () = ()
+  > let useFoo () = ()
+  > 
+  > let[@react.component] make ~randomProp =
+  >   if randomProp = "state" then useMouseHook ();
+  >   if randomProp = "other" then useFoo ();
+  >   div
+  > EOF
+
+  $ ../src/standalone.exe input.ml 2>&1 || true
+  [%%ocaml.error "Hooks can't be called conditionally"]
+  [%%ocaml.error "Hooks can't be called conditionally"]
+  let useMouseHook () = ()
+  let useFoo () = ()
+  let make ~randomProp =
+    if randomProp = "state" then useMouseHook ();
+    if randomProp = "other" then useFoo ();
+    div[@@react.component ]
