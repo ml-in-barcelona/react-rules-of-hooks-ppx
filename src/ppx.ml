@@ -291,9 +291,7 @@ let suppress_warning_hint ~is_reason =
   else "To suppress this warning, add [@@warning \"-22\"] to the expression"
 
 let format_deps_array (deps : string list) : string =
-  match deps with
-  | [] -> "[||]"
-  | _ -> "[| " ^ String.concat "; " deps ^ " |]"
+  match deps with [] -> "[||]" | _ -> "[| " ^ String.concat "; " deps ^ " |]"
 
 let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
     : Driver.Lint_error.t option =
@@ -342,7 +340,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
           let missing_dependencies =
             missing_deps_unique |> List.map quotes |> String.concat ", "
           in
-          if List.length missing_deps_unique > 0 then
+          if List.length missing_deps_unique > 0 then (
             let deps_loc =
               match deps_arg with
               | Some (_, deps_expr) -> deps_expr.pexp_loc
@@ -360,7 +358,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
                 missing_dependencies
                 (suppress_exhaustive_deps_hint ~is_reason)
             in
-            Some (Driver.Lint_error.of_string deps_loc msg)
+            Some (Driver.Lint_error.of_string deps_loc msg))
           else None
       else None
   | _ -> None

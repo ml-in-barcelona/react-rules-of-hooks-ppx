@@ -21,7 +21,9 @@
 
 (package
  (name react-rules-of-hooks-ppx)
- (synopsis "ppx that validates the rules of React hooks")
+ (synopsis "This ppx validates the rules of React hooks in reason-react components")
+ (description
+  "Validates exhaustive dependencies in useEffect, useLayoutEffect, useInsertionEffect, useCallback, useMemo and ensures hooks are called at the top level, never conditionally or inside loops.")
  (depends
   (ocaml (>= 4.14))
   (ppxlib (>= 0.25.0))
