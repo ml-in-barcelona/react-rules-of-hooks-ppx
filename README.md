@@ -50,7 +50,8 @@ With this ppx, it will produce the following warning:
 14 |     },
 15 |     [|show|],
          ^^^^^^^^
-         Error (warning 22): ExhaustiveDeps: Missing 'randomProp' in the dependency array. To suppress this warning, add [@disable_exhaustive_deps] before the expressionocamllsp
+         Error (warning 22): exhaustive-deps: Missing 'randomProp' in the dependency array.
+         To suppress this warning, add [@disable_exhaustive_deps] before the expression
 16 |   ).
 ```
 
@@ -122,6 +123,8 @@ React.useEffect1(() => {
 ```clojure
 (preprocess (pps reason-react react-rules-of-hooks-ppx -disable-order-of-hooks))
 ```
+
+> **Note:** Unlike exhaustive-deps, there is no per-expression attribute to suppress order-of-hooks warnings. This is intentional - calling hooks outside of components or custom hooks is almost always a bug. If you have a legitimate use case (e.g., test utilities), use the global `-disable-order-of-hooks` flag for that specific library.
 
 #### Enable automatic corrections for missing dependencies
 

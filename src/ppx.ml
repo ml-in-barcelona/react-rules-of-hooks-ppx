@@ -285,11 +285,6 @@ let suppress_exhaustive_deps_hint ~is_reason =
   else
     "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
 
-let suppress_warning_hint ~is_reason =
-  if is_reason then
-    "To suppress this warning, add [@warning \"-22\"] to the expression"
-  else "To suppress this warning, add [@@warning \"-22\"] to the expression"
-
 let format_deps_array (deps : string list) : string =
   match deps with [] -> "[||]" | _ -> "[| " ^ String.concat "; " deps ^ " |]"
 
@@ -354,7 +349,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
             let is_reason = is_reason_file ctx in
             let msg =
               Printf.sprintf
-                "ExhaustiveDeps: Missing %s in the dependency array. %s"
+                "exhaustive-deps: Missing %s in the dependency array.\n%s"
                 missing_dependencies
                 (suppress_exhaustive_deps_hint ~is_reason)
             in
@@ -459,7 +454,7 @@ let find_hooks_outside_allowed_context =
   in
   linter#structure
 
-let hooks_outside_allowed_context_linter (ctx : Expansion_context.Base.t)
+let hooks_outside_allowed_context_linter (_ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) : Driver.Lint_error.t list =
   if !disable_order_of_hooks_flag then []
   else
@@ -471,14 +466,11 @@ let hooks_outside_allowed_context_linter (ctx : Expansion_context.Base.t)
           locations = [];
         }
     in
-    let is_reason = is_reason_file ctx in
     locations |> unique
     |> List.map (fun loc ->
         let msg =
-          Printf.sprintf
-            "React hooks can only be called from [@react.component] functions \
-             or custom hooks. %s"
-            (suppress_warning_hint ~is_reason)
+          "React hooks can only be called from [@react.component] functions or \
+           custom hooks."
         in
         Driver.Lint_error.of_string loc msg)
 

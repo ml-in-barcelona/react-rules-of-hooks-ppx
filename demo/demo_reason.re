@@ -31,6 +31,9 @@ let missing_dep_component = (~name) => {
       None;
     },
     [|name|],
+    //  ^^^^^^^^
+    //  Error (warning 22): exhaustive-deps: Missing 'name' in the dependency array.
+    //  To suppress this warning, add [@disable_exhaustive_deps] before the expression
   );
   let _expensive = React.useMemo1(() => {45 + 45 + name}, [||]);
   let _expensive_but_ignored =

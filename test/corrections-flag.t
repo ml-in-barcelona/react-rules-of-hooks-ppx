@@ -7,7 +7,7 @@
 Without the -corrections flag, only the warning should appear (no diff):
   $ ../src/standalone.exe input.ml 2>&1 || true
   [@@@ocaml.ppwarning
-    "ExhaustiveDeps: Missing 'value' in the dependency array. To suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing 'value' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   let make ~value =
     let _memoized = React.useMemo1 (fun () -> value + 1) [||] in div[@@react.component
                                                                       ]
