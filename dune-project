@@ -25,4 +25,11 @@
  (depends
   (ocaml (>= 4.14))
   (ppxlib (>= 0.25.0))
-  (reason (and :with-test (>= 3.10.0)))))
+  (reason (and :with-test (>= 3.10.0)))
+  (melange :with-dev-setup)
+  (ocamlformat :with-dev-setup)
+  (ocaml-lsp-server :with-dev-setup)
+  (mlx :with-dev-setup)
+  (ocamlformat-mlx :with-dev-setup)
+  (ocamlmerlin-mlx :with-dev-setup)
+))
