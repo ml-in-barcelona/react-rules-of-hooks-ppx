@@ -1,5 +1,8 @@
 (library
  (name demo)
- (modes melange)
+ (enabled_if
+  (= %{env:BUILD_DEMO=false} "true"))
+ (flags
+  (:standard -w +22))
  (preprocess
   (pps react-rules-of-hooks-ppx)))

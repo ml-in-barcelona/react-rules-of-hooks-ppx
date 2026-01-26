@@ -1,7 +1,7 @@
 open Ppxlib
 
-let exhaustive_deps = ref true
-let order_of_hooks = ref true
+let disable_exhaustive_deps_flag = ref false
+let disable_order_of_hooks_flag = ref false
 
 let make_error_stri ~loc msg =
   Ast_builder.Default.pstr_extension ~loc
@@ -279,12 +279,14 @@ let is_reason_file (ctx : Expansion_context.Base.t) =
 
 let suppress_exhaustive_deps_hint ~is_reason =
   if is_reason then
-    "To suppress this warning, add [@disable_exhaustive_deps] before the expression"
+    "To suppress this warning, add [@disable_exhaustive_deps] before the \
+     expression"
   else
     "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
 
 let suppress_warning_hint ~is_reason =
-  if is_reason then "To suppress this warning, add [@warning \"-22\"] to the expression"
+  if is_reason then
+    "To suppress this warning, add [@warning \"-22\"] to the expression"
   else "To suppress this warning, add [@@warning \"-22\"] to the expression"
 
 let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
@@ -364,7 +366,7 @@ let find_missing_deps ctx =
 
 let exhaustive_deps_linter (ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) : Driver.Lint_error.t list =
-  if not !exhaustive_deps then []
+  if !disable_exhaustive_deps_flag then []
   else (find_missing_deps ctx)#structure structure []
 
 let starts_with affix str =
@@ -449,7 +451,7 @@ let find_hooks_outside_allowed_context =
 
 let hooks_outside_allowed_context_linter (ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) : Driver.Lint_error.t list =
-  if not !order_of_hooks then []
+  if !disable_order_of_hooks_flag then []
   else
     let { locations; _ } =
       find_hooks_outside_allowed_context structure
@@ -566,7 +568,7 @@ let find_conditional_hooks =
 
 let conditional_hooks_linter (_ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) =
-  if not !order_of_hooks then structure
+  if !disable_order_of_hooks_flag then structure
   else
     let { locations; _ } =
       find_conditional_hooks structure
@@ -588,11 +590,11 @@ let lint_impl (ctx : Expansion_context.Base.t) (structure : Parsetree.structure)
   @ hooks_outside_allowed_context_linter ctx structure
 
 let () =
-  Driver.add_arg "-exhaustive-deps" (Set exhaustive_deps)
-    ~doc:"If set, checks for 'exhaustive dependencies' in UseEffects";
+  Driver.add_arg "-disable-exhaustive-deps" (Set disable_exhaustive_deps_flag)
+    ~doc:"If set, disables checking for 'exhaustive dependencies' in UseEffects";
 
-  Driver.add_arg "-order-of-hooks" (Set order_of_hooks)
-    ~doc:"If set, checks for hooks being called at the top level";
+  Driver.add_arg "-disable-order-of-hooks" (Set disable_order_of_hooks_flag)
+    ~doc:"If set, disables checking for hooks being called at the top level";
 
   Driver.V2.register_transformation ~impl:conditional_hooks_linter ~lint_impl
     "react-rules-of-hooks"

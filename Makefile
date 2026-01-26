@@ -22,6 +22,14 @@ dev: ## Build in watch mode
 clean: ## Clean artifacts
 	$(DUNE) clean
 
+.PHONY: build-demo
+build-demo: ## Build demo folder to test ppx errors
+	BUILD_DEMO=true $(DUNE) build demo/
+
+.PHONY: dev-demo
+dev-demo: ## Build demo folder in watch mode
+	BUILD_DEMO=true $(DUNE) build demo/ -w
+
 .PHONY: test
 test: ## Run the tests
 	$(DUNE) build @runtest

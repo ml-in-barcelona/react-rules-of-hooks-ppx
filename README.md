@@ -1,74 +1,17 @@
 # react-rules-of-hooks-ppx
 
-> STATUS: This project isn't complete and might give false-positives. [Read more](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx#status)
+A ppx that validates React's [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) at compile time.
 
-This package is a no-op ppx rewriter. It is used as a 'lint' to
-enforce React's [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks).
+### **Features**
+- Exhaustive dependencies in useEffect, useCallback, useMemo, etc.
+- Order of Hooks validation:
+  - Hooks can't be called conditionally
+  - Hooks must be called at the top level
+  - Hooks can only be called from `[@react.component]` functions or custom hooks
 
-- [x] Exhaustive dependencies in useEffect
-- [x] Order of Hooks
-  - [x] Hooks shoudn't be called in different order
-  - [x] Only call Hooks at the Top Level
-  - [x] Only call Hooks from [@react.components] or custom hook functions
+## How it works
 
-## Why
-
-One of the points of using [Reason](https://reasonml.github.io) or [ReScript](https://rescript-lang.org) is to have a compiler that warns about issues with your code, where functions expect different types from the given ones. That's Type-checking and works amazingly well, but there are some cases where even with the right types, the runtime of your program can cause issues. Very commonly in side-effects. I found this case while working with ReasonReact.
-
-ReasonReact and useEffect hooks is one of those cases, where types ensures that the functions are called correctly, but they have certain rules that aren't cacheable at the type-system. Not following those rules might cause some unexpected bug or even a run-time error.
-
-This package solves this problem based on the [React's Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks).
-
-## Install
-
-```bash
-opam install react-rules-of-hooks-ppx --save-dev
-```
-
-Add the ppx into the dune files
-
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx))
-```
-
-### Disable "Exhaustive dependencies in useEffect"
-
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx -exhaustive-deps))
-```
-
-### Disable "Order of Hooks"
-
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx -order-of-hooks))
-```
-
-### Suppress warnings locally
-
-If you need to suppress an exhaustive deps warning for a specific case (e.g., you intentionally want to omit a dependency), use the `[@disable_exhaustive_deps]` attribute.
-
-**In Reason (.re files):**
-```re
-[@disable_exhaustive_deps]
-React.useEffect1(() => {
-  /* ... */
-  None
-}, [|dep|]);
-```
-
-**In OCaml (.ml files):**
-```ocaml
-(React.useEffect1 (fun () ->
-  (* ... *)
-  None
-) [|dep|])[@disable_exhaustive_deps]
-```
-
-## Issues
-
-Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
-
-## Demo
+### Exhaustive dependencies
 
 Here we have a dummy react component:
 
@@ -94,7 +37,7 @@ let make = (~randomProp) => {
 };
 ```
 
-With this ppx, it will produce the following error:
+With this ppx, it will produce the following warning:
 
 ```bash
  6 | ..React.useEffect1(
@@ -106,10 +49,83 @@ With this ppx, it will produce the following error:
 13 |       None;
 14 |     },
 15 |     [|show|],
+         ^^^^^^^^
+         Error (warning 22): ExhaustiveDeps: Missing 'randomProp' in the dependency array. To suppress this warning, add [@disable_exhaustive_deps] before the expressionocamllsp
 16 |   ).
-
-Error: ExhaustiveDeps: Missing 'randomProp' in the dependency array
 ```
+
+### Order of hooks
+
+Hooks must be called at the top level of your component. Calling hooks inside conditionals, loops, or nested functions will produce an error that fails the build:
+
+```reason
+[@react.component]
+let make = (~condition) => {
+  if (condition) {
+    let (state, _) = React.useState(() => 0); /* That's wrong */
+    ();
+  };
+  <div />;
+};
+```
+
+This will produce the following error:
+
+```bash
+3 |   if (condition) {
+4 |     let (state, _) = React.useState(() => 0);
+                         ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Hooks can't be called conditionally and must be called at the top-level of your component. Move this hook call outside of conditionals, loops, or nested functions.
+```
+
+## Install
+
+```bash
+opam install react-rules-of-hooks-ppx --save-dev
+```
+
+Add the ppx into the dune files
+
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx))
+```
+
+#### Suppress warnings locally
+
+If you need to suppress an exhaustive deps warning for a specific case (e.g., you intentionally want to omit a dependency), use the `[@disable_exhaustive_deps]` attribute.
+
+**In Reason (.re files):**
+```reason
+[@disable_exhaustive_deps]
+React.useEffect1(() => {
+  /* ... */
+  None
+}, [|dep|]);
+```
+
+**In OCaml (.ml files):**
+```ocaml
+(React.useEffect1 (fun () ->
+  (* ... *)
+  None
+) [|dep|])[@disable_exhaustive_deps]
+```
+
+#### Disable "Exhaustive dependencies in useEffect" on the library
+
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx -disable-exhaustive-deps))
+```
+
+##### Disable "Order of Hooks" on the library
+
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx -disable-order-of-hooks))
+```
+
+## Issues
+
+Feel free to use it and report any unexpected behaviour in the [bug tracker](https://github.com/ml-in-barcelona/react-rules-of-hooks-ppx/issues)
 
 ## Acknowledgements
 

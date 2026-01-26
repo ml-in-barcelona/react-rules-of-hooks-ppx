@@ -17,6 +17,7 @@ depends: [
   "ocaml-lsp-server" {with-dev-setup}
   "mlx" {with-dev-setup}
   "ocamlformat-mlx" {with-dev-setup}
+  "ocamlmerlin-mlx" {with-dev-setup}
   "odoc" {with-doc}
 ]
 build: [
