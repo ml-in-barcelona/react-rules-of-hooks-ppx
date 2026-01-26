@@ -2,6 +2,7 @@ open Ppxlib
 
 let disable_exhaustive_deps_flag = ref false
 let disable_order_of_hooks_flag = ref false
+let enable_corrections_flag = ref false
 
 let make_error_stri ~loc msg =
   Ast_builder.Default.pstr_extension ~loc
@@ -289,6 +290,11 @@ let suppress_warning_hint ~is_reason =
     "To suppress this warning, add [@warning \"-22\"] to the expression"
   else "To suppress this warning, add [@@warning \"-22\"] to the expression"
 
+let format_deps_array (deps : string list) : string =
+  match deps with
+  | [] -> "[||]"
+  | _ -> "[| " ^ String.concat "; " deps ^ " |]"
+
 let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
     : Driver.Lint_error.t option =
   match e.pexp_desc with
@@ -332,15 +338,21 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
             dependencies_idents.ids |> List.map Longident.name
           in
           let result = diff body_idents_inside_scope dependencies_names in
+          let missing_deps_unique = result |> unique in
           let missing_dependencies =
-            result |> unique |> List.map quotes |> String.concat ", "
+            missing_deps_unique |> List.map quotes |> String.concat ", "
           in
-          if List.length result > 0 then
+          if List.length missing_deps_unique > 0 then
             let deps_loc =
               match deps_arg with
               | Some (_, deps_expr) -> deps_expr.pexp_loc
               | None -> e.pexp_loc
             in
+            if !enable_corrections_flag then begin
+              let all_deps = dependencies_names @ missing_deps_unique in
+              let corrected_str = format_deps_array all_deps in
+              Driver.register_correction ~loc:deps_loc ~repl:corrected_str
+            end;
             let is_reason = is_reason_file ctx in
             let msg =
               Printf.sprintf
@@ -595,6 +607,11 @@ let () =
 
   Driver.add_arg "-disable-order-of-hooks" (Set disable_order_of_hooks_flag)
     ~doc:"If set, disables checking for hooks being called at the top level";
+
+  Driver.add_arg "-corrections" (Set enable_corrections_flag)
+    ~doc:
+      "If set, generates .ppx-corrected files with suggested fixes for \
+       exhaustive dependencies";
 
   Driver.V2.register_transformation ~impl:conditional_hooks_linter ~lint_impl
     "react-rules-of-hooks"

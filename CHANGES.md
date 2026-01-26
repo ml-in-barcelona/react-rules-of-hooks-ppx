@@ -8,3 +8,4 @@
 - Disable order of hooks check globally with `-order-of-hooks` ppx flag
 - Disable exhaustive deps check globally with `-exhaustive-deps` ppx flag
 - Suppress exhaustive deps warning locally with `[@disable_exhaustive_deps]` attribute
+- `-corrections` flag to generate `.ppx-corrected` files with suggested fixes for missing dependencies

@@ -123,6 +123,23 @@ React.useEffect1(() => {
 (preprocess (pps reason-react react-rules-of-hooks-ppx -disable-order-of-hooks))
 ```
 
+#### Enable automatic corrections for missing dependencies
+
+This ppx can generate `.ppx-corrected` files with suggested fixes for missing dependencies. This integrates with dune's promotion workflow, allowing you to review and accept the suggested changes.
+
+```clojure
+(preprocess (pps reason-react react-rules-of-hooks-ppx -corrections))
+```
+
+When enabled, running the build will show a diff with the suggested fix:
+
+```diff
+-    [||]
++    [| value |]
+```
+
+You can then use `dune promote` to accept the corrections.
+
 ## Issues
 
 Feel free to use it and report any unexpected behaviour in the [bug tracker](https://github.com/ml-in-barcelona/react-rules-of-hooks-ppx/issues)
