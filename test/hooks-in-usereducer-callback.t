@@ -1,0 +1,16 @@
+  $ cat > input.ml << 'EOF'
+  > let[@react.component] make ~initialValue =
+  >   let _state, _dispatch = React.useReducer (fun state action ->
+  >     let _ = React.useState (fun () -> 0) in
+  >     state
+  >   ) initialValue in
+  >   div
+  > EOF
+
+  $ ../src/standalone.exe input.ml 2>&1 || true
+  let make ~initialValue =
+    let (_state, _dispatch) =
+      React.useReducer
+        (fun state action -> let _ = React.useState (fun () -> 0) in state)
+        initialValue in
+    div[@@react.component ]

@@ -1,2 +1,0 @@
-(cram
- (deps %{project_root}/src/standalone.exe))

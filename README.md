@@ -3,12 +3,13 @@
 > STATUS: This project isn't complete and might give false-positives. [Read more](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx#status)
 
 This package is a no-op ppx rewriter. It is used as a 'lint' to
-enforce React's [Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html).
+enforce React's [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks).
 
 - [x] Exhaustive dependencies in useEffect
 - [x] Order of Hooks
   - [x] Hooks shoudn't be called in different order
-  - [x] Only Call Hooks at the Top Level
+  - [x] Only call Hooks at the Top Level
+  - [x] Only call Hooks from [@react.components] or custom hook functions
 
 ## Why
 
@@ -16,11 +17,7 @@ One of the points of using [Reason](https://reasonml.github.io) or [ReScript](ht
 
 ReasonReact and useEffect hooks is one of those cases, where types ensures that the functions are called correctly, but they have certain rules that aren't cacheable at the type-system. Not following those rules might cause some unexpected bug or even a run-time error.
 
-This package solves this problem, lints the `use(Layout)Effect` from your react.components based on the [React's Rules of Hooks](https://en.reactjs.org/docs/hooks-rules.html)
-
-## Status
-
-It's a proof of concept on re-creating the ESLint plugin, and it's very restrictive and not always useful in the Reason/ReScript context. Values are immutable by default, so functions or Modules from the exterior of a useEffect will not change at anytime during runtime. The only benefit is where state/props values are missing, which is a great addition to check your useEffects.
+This package solves this problem based on the [React's Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks).
 
 ## Install
 
@@ -28,7 +25,7 @@ It's a proof of concept on re-creating the ESLint plugin, and it's very restrict
 opam install react-rules-of-hooks-ppx --save-dev
 ```
 
-Add the ppx on the BuckleScript config (`bsconfig.json`)
+Add the ppx into the dune files
 
 ```clojure
 (preprocess (pps reason-react react-rules-of-hooks-ppx))
@@ -46,6 +43,27 @@ Add the ppx on the BuckleScript config (`bsconfig.json`)
 (preprocess (pps reason-react react-rules-of-hooks-ppx -order-of-hooks))
 ```
 
+### Suppress warnings locally
+
+If you need to suppress an exhaustive deps warning for a specific case (e.g., you intentionally want to omit a dependency), use the `[@disable_exhaustive_deps]` attribute.
+
+**In Reason (.re files):**
+```re
+[@disable_exhaustive_deps]
+React.useEffect1(() => {
+  /* ... */
+  None
+}, [|dep|]);
+```
+
+**In OCaml (.ml files):**
+```ocaml
+(React.useEffect1 (fun () ->
+  (* ... *)
+  None
+) [|dep|])[@disable_exhaustive_deps]
+```
+
 ## Issues
 
 Feel free to use it and report any unexpected behaviour in the [issue section](https://github.com/reason-in-barcelona/react-rules-of-hooks-ppx/issues)
@@ -56,14 +74,14 @@ Here we have a dummy react component:
 
 ```re
 [@react.component]
-/* Recives a prop called "randomProp" */
+/* Recives a "randomProp" prop */
 let make = (~randomProp) => {
   let (show, setShow) = React.useState(() => false);
 
-  /* We have a useEffect that re-runs each time that "show" changes it's value, and we want to update "show" when randomProp is true. */
+  /* We have a useEffect that re-runs each time the state "show" changes it's value, and we only want to trigger the `setShow` when `randomProp` is true. */
   React.useEffect1(
     () => {
-      /* Since this effect relies on "randomProp" and misses ont the dependency array, will cause undesired behaviour. */
+      /* Since this effect relies on "randomProp" and is not present on the dependency array... it will re-run only when show changes, and not when randomProp changes and may cause undesired behaviour */
       if (randomProp) {
         setShow(prevShow => !prevShow);
       }
@@ -76,7 +94,7 @@ let make = (~randomProp) => {
 };
 ```
 
-Produces the following error:
+With this ppx, it will produce the following error:
 
 ```bash
  6 | ..React.useEffect1(

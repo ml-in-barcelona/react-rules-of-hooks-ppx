@@ -1,7 +1,18 @@
-(lang dune 3.0)
+(lang dune 3.16)
+(using melange 0.1)
+
 (name react-rules-of-hooks-ppx)
-(cram enable)
 (generate_opam_files true)
+
+(dialect
+ (name mlx)
+ (implementation
+  (extension mlx)
+  (merlin_reader mlx)
+  (format
+   (run ocamlformat-mlx %{input-file}))
+  (preprocess
+   (run mlx-pp %{input-file}))))
 
 (license MIT)
 (maintainers "David Sancho <dsnxmoreno@gmail.com>")
@@ -10,7 +21,7 @@
 
 (package
  (name react-rules-of-hooks-ppx)
- (synopsis "PPX that validates the rules of React hooks")
+ (synopsis "ppx that validates the rules of React hooks")
  (depends
   (ocaml (>= 4.14))
   (ppxlib (>= 0.25.0))

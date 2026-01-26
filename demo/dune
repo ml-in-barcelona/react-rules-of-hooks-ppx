@@ -1,0 +1,5 @@
+(library
+ (name demo)
+ (modes melange)
+ (preprocess
+  (pps react-rules-of-hooks-ppx)))

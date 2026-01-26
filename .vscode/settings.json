@@ -3,7 +3,7 @@
     "editor.formatOnSave": true
   },
   "ocaml.sandbox": {
-    "kind": "esy",
-    "root": "${workspaceFolder:react-rules-of-hooks-ppx}"
+    "kind": "opam",
+    "switch": "${workspaceFolder:react-rules-of-hooks-ppx}"
   },
 }

@@ -12,8 +12,10 @@ This test showcases that multiple errors can be reported at once
   > EOF
 
   $ ../src/standalone.exe input.ml 2>&1 || true
-  [%%ocaml.error "Hooks can't be called conditionally"]
-  [%%ocaml.error "Hooks can't be called conditionally"]
+  [%%ocaml.error
+    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+  [%%ocaml.error
+    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
   let useFoo () = ()
   let make ~randomProp =

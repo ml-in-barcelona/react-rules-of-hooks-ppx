@@ -3,10 +3,6 @@ open Ppxlib
 let exhaustive_deps = ref true
 let order_of_hooks = ref true
 
-let make_error_expr ~loc msg =
-  Ast_builder.Default.pexp_extension ~loc
-    (Location.error_extensionf ~loc "%s" msg)
-
 let make_error_stri ~loc msg =
   Ast_builder.Default.pstr_extension ~loc
     (Location.error_extensionf ~loc "%s" msg)
@@ -255,49 +251,224 @@ let rec get_function_body (expr : Parsetree.expression) :
   | Pexp_constraint (e, _) -> get_function_body e
   | _ -> None
 
-let use_effect_lint (e : Parsetree.expression) =
+let hooks_with_deps =
+  let variants = [ ""; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
+  let prefixes = [ "React."; "" ] in
+  let hooks =
+    [
+      "useEffect";
+      "useLayoutEffect";
+      "useInsertionEffect";
+      "useCallback";
+      "useMemo";
+    ]
+  in
+  List.concat_map
+    (fun hook ->
+      List.concat_map
+        (fun variant ->
+          List.map (fun prefix -> prefix ^ hook ^ variant) prefixes)
+        variants)
+    hooks
+
+let is_hook_with_deps name = List.mem name hooks_with_deps
+
+let is_reason_file (ctx : Expansion_context.Base.t) =
+  let filename = Expansion_context.Base.input_name ctx in
+  Filename.check_suffix filename ".re" || Filename.check_suffix filename ".rei"
+
+let suppress_exhaustive_deps_hint ~is_reason =
+  if is_reason then
+    "To suppress this warning, add [@disable_exhaustive_deps] before the expression"
+  else
+    "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
+
+let suppress_warning_hint ~is_reason =
+  if is_reason then "To suppress this warning, add [@warning \"-22\"] to the expression"
+  else "To suppress this warning, add [@@warning \"-22\"] to the expression"
+
+let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
+    : Driver.Lint_error.t option =
   match e.pexp_desc with
-  | Pexp_apply ({ pexp_desc = Pexp_ident _; _ }, args) ->
-      let body_expression =
-        match List.nth_opt args 0 with
-        | Some (_, fn_expr) -> get_function_body fn_expr
-        | _ -> None
-      in
-      let body_idents =
-        body_expression |> Option.map get_idents
-        |> Option.value ~default:{ ids = []; values = [] }
-      in
-      let body_idents_inside_scope =
-        diff (body_idents.ids |> List.map Longident.name) body_idents.values
-      in
-      let dependencies_idents =
-        List.nth_opt args 1
-        |> Option.map (fun a -> snd a)
-        |> Option.map (fun deps -> get_idents deps)
-        |> Option.value ~default:{ ids = []; values = [] }
-      in
-      let dependencies_names =
-        dependencies_idents.ids |> List.map Longident.name
-      in
-      let result = diff body_idents_inside_scope dependencies_names in
-      let missing_dependencies =
-        result |> unique |> List.map quotes |> String.concat ", "
-      in
-      if List.length result > 0 then
-        let msg =
-          Printf.sprintf "ExhaustiveDeps: Missing %s in the dependency array"
-            missing_dependencies
+  | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args) ->
+      let name = Longident.name lident in
+      if is_hook_with_deps name then
+        let deps_arg = List.nth_opt args 1 in
+        let check_disable_attr attrs =
+          attrs
+          |> List.exists (fun { attr_name; _ } ->
+              attr_name.txt = "disable_exhaustive_deps")
         in
-        Some (make_error_expr ~loc:e.pexp_loc msg)
+        let has_disable_attr_on_expr = check_disable_attr e.pexp_attributes in
+        let has_disable_attr_on_deps =
+          deps_arg
+          |> Option.map (fun (_, deps_expr) ->
+              check_disable_attr deps_expr.pexp_attributes)
+          |> Option.value ~default:false
+        in
+        if has_disable_attr_on_expr || has_disable_attr_on_deps then None
+        else
+          let body_expression =
+            match List.nth_opt args 0 with
+            | Some (_, fn_expr) -> get_function_body fn_expr
+            | _ -> None
+          in
+          let body_idents =
+            body_expression |> Option.map get_idents
+            |> Option.value ~default:{ ids = []; values = [] }
+          in
+          let body_idents_inside_scope =
+            diff (body_idents.ids |> List.map Longident.name) body_idents.values
+          in
+          let dependencies_idents =
+            deps_arg
+            |> Option.map (fun a -> snd a)
+            |> Option.map (fun deps -> get_idents deps)
+            |> Option.value ~default:{ ids = []; values = [] }
+          in
+          let dependencies_names =
+            dependencies_idents.ids |> List.map Longident.name
+          in
+          let result = diff body_idents_inside_scope dependencies_names in
+          let missing_dependencies =
+            result |> unique |> List.map quotes |> String.concat ", "
+          in
+          if List.length result > 0 then
+            let deps_loc =
+              match deps_arg with
+              | Some (_, deps_expr) -> deps_expr.pexp_loc
+              | None -> e.pexp_loc
+            in
+            let is_reason = is_reason_file ctx in
+            let msg =
+              Printf.sprintf
+                "ExhaustiveDeps: Missing %s in the dependency array. %s"
+                missing_dependencies
+                (suppress_exhaustive_deps_hint ~is_reason)
+            in
+            Some (Driver.Lint_error.of_string deps_loc msg)
+          else None
       else None
   | _ -> None
 
-let use_effect_expand (e : Parsetree.expression) =
-  if !exhaustive_deps then use_effect_lint e else None
+let find_missing_deps ctx =
+  object (_self)
+    inherit [Driver.Lint_error.t list] Ast_traverse.fold as super
+
+    method! expression t acc =
+      let acc = super#expression t acc in
+      match check_hook_deps ctx t with
+      | Some error -> error :: acc
+      | None -> acc
+  end
+
+let exhaustive_deps_linter (ctx : Expansion_context.Base.t)
+    (structure : Parsetree.structure) : Driver.Lint_error.t list =
+  if not !exhaustive_deps then []
+  else (find_missing_deps ctx)#structure structure []
 
 let starts_with affix str =
   let start = try String.sub str 0 (String.length affix) with _ -> "" in
   start = affix
+
+let get_name longident =
+  match longident with Lident l -> Some l | Ldot (_, l) -> Some l | _ -> None
+
+let is_a_hook_name name = starts_with "use" name
+
+let is_a_hook longident =
+  match get_name longident with
+  | Some name -> is_a_hook_name name
+  | None -> false
+
+type hook_context = {
+  is_inside_component : bool;
+  is_inside_custom_hook : bool;
+  locations : Location.t list;
+}
+
+let has_attribute name attrs =
+  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = name)
+
+let find_hooks_outside_allowed_context =
+  let linter =
+    object (_self)
+      inherit [hook_context] Ast_traverse.fold as super
+
+      method! value_binding t acc =
+        let is_function_binding =
+          match get_function_body t.pvb_expr with
+          | Some _ -> true
+          | None -> false
+        in
+        let binding_names = extract_pattern_names t.pvb_pat in
+        let is_custom_hook_binding =
+          is_function_binding && List.exists is_a_hook_name binding_names
+        in
+        let is_component_binding =
+          is_function_binding
+          && (has_attribute "react.component" t.pvb_attributes
+             || has_attribute "react.component" t.pvb_pat.ppat_attributes)
+        in
+        let acc_for_binding =
+          if is_function_binding then
+            if is_component_binding then
+              {
+                acc with
+                is_inside_component = true;
+                is_inside_custom_hook = false;
+              }
+            else if is_custom_hook_binding then
+              {
+                acc with
+                is_inside_component = false;
+                is_inside_custom_hook = true;
+              }
+            else
+              {
+                acc with
+                is_inside_component = false;
+                is_inside_custom_hook = false;
+              }
+          else acc
+        in
+        let acc_after = super#value_binding t acc_for_binding in
+        { acc with locations = acc_after.locations }
+
+      method! expression t acc =
+        let acc = super#expression t acc in
+        match t.pexp_desc with
+        | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _args)
+          when is_a_hook lident
+               && not (acc.is_inside_component || acc.is_inside_custom_hook) ->
+            { acc with locations = t.pexp_loc :: acc.locations }
+        | _ -> acc
+    end
+  in
+  linter#structure
+
+let hooks_outside_allowed_context_linter (ctx : Expansion_context.Base.t)
+    (structure : Parsetree.structure) : Driver.Lint_error.t list =
+  if not !order_of_hooks then []
+  else
+    let { locations; _ } =
+      find_hooks_outside_allowed_context structure
+        {
+          is_inside_component = false;
+          is_inside_custom_hook = false;
+          locations = [];
+        }
+    in
+    let is_reason = is_reason_file ctx in
+    locations |> unique
+    |> List.map (fun loc ->
+        let msg =
+          Printf.sprintf
+            "React hooks can only be called from [@react.component] functions \
+             or custom hooks. %s"
+            (suppress_warning_hint ~is_reason)
+        in
+        Driver.Lint_error.of_string loc msg)
 
 type acc = {
   is_inside_conditional : bool;
@@ -306,13 +477,6 @@ type acc = {
 }
 
 let find_conditional_hooks =
-  let get_name lident =
-    match lident with Lident l -> l | Ldot (_, l) -> l | _ -> ""
-  in
-  let is_a_hook lident =
-    let name = get_name lident in
-    starts_with "use" name
-  in
   let contains_jsx (attrs : attributes) =
     attrs
     |> List.find_opt (fun { attr_name; _ } -> attr_name.txt = "JSX")
@@ -400,7 +564,8 @@ let find_conditional_hooks =
   in
   linter#structure
 
-let conditional_hooks_linter (structure : Parsetree.structure) =
+let conditional_hooks_linter (_ctx : Expansion_context.Base.t)
+    (structure : Parsetree.structure) =
   if not !order_of_hooks then structure
   else
     let { locations; _ } =
@@ -410,25 +575,17 @@ let conditional_hooks_linter (structure : Parsetree.structure) =
     let error_items =
       locations |> unique
       |> List.map (fun loc ->
-          make_error_stri ~loc "Hooks can't be called conditionally")
+          make_error_stri ~loc
+            "Hooks can't be called conditionally and must be called at the top \
+             level of your component. Move this hook call outside of \
+             conditionals, loops, or nested functions.")
     in
     error_items @ structure
 
-let make_rules hooks expand =
-  let variants = [ ""; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
-  let prefixes = [ "React."; "" ] in
-  List.concat_map
-    (fun hook ->
-      List.concat_map
-        (fun variant ->
-          List.map
-            (fun prefix ->
-              Context_free.Rule.special_function
-                (prefix ^ hook ^ variant)
-                expand)
-            prefixes)
-        variants)
-    hooks
+let lint_impl (ctx : Expansion_context.Base.t) (structure : Parsetree.structure)
+    : Driver.Lint_error.t list =
+  exhaustive_deps_linter ctx structure
+  @ hooks_outside_allowed_context_linter ctx structure
 
 let () =
   Driver.add_arg "-exhaustive-deps" (Set exhaustive_deps)
@@ -437,16 +594,5 @@ let () =
   Driver.add_arg "-order-of-hooks" (Set order_of_hooks)
     ~doc:"If set, checks for hooks being called at the top level";
 
-  let effect_rules =
-    make_rules
-      [ "useEffect"; "useLayoutEffect"; "useInsertionEffect" ]
-      use_effect_expand
-  in
-
-  let callback_memo_rules =
-    make_rules [ "useCallback"; "useMemo" ] use_effect_expand
-  in
-
-  Driver.register_transformation ~impl:conditional_hooks_linter
-    ~rules:(effect_rules @ callback_memo_rules)
+  Driver.V2.register_transformation ~impl:conditional_hooks_linter ~lint_impl
     "react-rules-of-hooks"

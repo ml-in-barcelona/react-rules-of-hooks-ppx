@@ -1,10 +1,14 @@
   $ cat > input.ml << 'EOF'
   > let[@react.component] make () =
-  >   (div ~onClick:(fun _evt -> useMouseHook ()) ())[@JSX]
+  >   try
+  >     let _ = React.useState (fun () -> 0) in
+  >     div
+  >   with _ -> div
   > EOF
 
+Hooks inside try/catch should be detected as conditional
   $ ../src/standalone.exe input.ml 2>&1 || true
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
-  let make () = ((div ~onClick:(fun _evt -> useMouseHook ()) ())[@JSX ])
+  let make () = try let _ = React.useState (fun () -> 0) in div with | _ -> div
     [@@react.component ]

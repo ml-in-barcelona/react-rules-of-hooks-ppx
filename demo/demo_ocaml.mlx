@@ -1,0 +1,30 @@
+module React = struct
+  let useState init = (init (), fun _ -> ())
+  let useEffect fn deps = ignore (fn, deps)
+  let useEffect1 fn deps = ignore (fn, deps)
+  let useEffect2 fn deps = ignore (fn, deps)
+  let useMemo fn deps = fn (), deps
+  let useCallback fn deps = fn, deps
+  let string s = s
+end
+
+let[@react.component] valid_component ~name =
+  let state, _setState = React.useState (fun () -> 0) in
+  React.useEffect1 (fun () -> Js.log state; None) [| state |];
+  <div>
+    <span>(React.string name)</span>
+  </div>
+
+let[@react.component] missing_dep_component ~name =
+  let state, _setState = React.useState (fun () -> 0) in
+  React.useEffect1 (fun () -> Js.log state; None) [| name |];
+  <div>
+    <span>(React.string name)</span>
+  </div>
+
+let[@react.component] conditional_hook_component ~condition =
+  if condition then (
+    let _state, _ = React.useState (fun () -> 0) in
+    ()
+  );
+  <div />
