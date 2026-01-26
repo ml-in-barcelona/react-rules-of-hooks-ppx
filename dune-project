@@ -26,7 +26,7 @@
   "Validates exhaustive dependencies in useEffect, useLayoutEffect, useInsertionEffect, useCallback, useMemo and ensures hooks are called at the top level, never conditionally or inside loops.")
  (depends
   (ocaml (>= 4.14))
-  (ppxlib (>= 0.25.0))
+  (ppxlib (>= 0.36.0))
   (reason (and :with-test (>= 3.10.0)))
   (melange :with-dev-setup)
   (ocamlformat :with-dev-setup)

@@ -13,7 +13,7 @@ bug-reports:
 depends: [
   "dune" {>= "3.16"}
   "ocaml" {>= "4.14"}
-  "ppxlib" {>= "0.25.0"}
+  "ppxlib" {>= "0.36.0"}
   "reason" {with-test & >= "3.10.0"}
   "melange" {with-dev-setup}
   "ocamlformat" {with-dev-setup}
