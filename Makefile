@@ -60,7 +60,7 @@ create-switch: ## Create opam switch
 
 .PHONY: install
 install: ## Install dependencies
-	opam install . --deps-only --with-test -y
+	opam install . --deps-only --with-test --with-dev-setup -y
 
 .PHONY: init
 init: create-switch install ## Create a local dev environment
