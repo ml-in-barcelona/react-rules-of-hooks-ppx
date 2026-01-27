@@ -1,9 +1,5 @@
 # Changes
 
-## Unreleased
-
-- Improve `-corrections` according to the reason-react interface
-
 ## 1.0.0
 
 - Detect hooks called conditionally, in loops, or in nested functions
@@ -13,3 +9,4 @@
 - Disable exhaustive deps check globally with `-exhaustive-deps` ppx flag
 - Suppress exhaustive deps warning locally with `[@disable_exhaustive_deps]` attribute
 - `-corrections` flag to generate `.ppx-corrected` files with suggested fixes for missing dependencies
+- Improve `-corrections` according to the reason-react interface
