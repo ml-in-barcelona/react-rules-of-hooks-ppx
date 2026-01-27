@@ -253,7 +253,7 @@ let rec get_function_body (expr : Parsetree.expression) :
   | _ -> None
 
 let hooks_with_deps =
-  let variants = [ ""; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
+  let variants = [ ""; "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
   let prefixes = [ "React."; "" ] in
   let hooks =
     [
@@ -285,13 +285,58 @@ let suppress_exhaustive_deps_hint ~is_reason =
   else
     "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
 
-let format_deps_array (deps : string list) : string =
-  match deps with [] -> "[||]" | _ -> "[| " ^ String.concat "; " deps ^ " |]"
+let starts_with affix str =
+  let start = try String.sub str 0 (String.length affix) with _ -> "" in
+  start = affix
+
+let format_deps (deps : string list) : string =
+  match deps with
+  | [] -> "[||]"
+  | [ dep ] -> "[| " ^ dep ^ " |]"
+  | _ -> "(" ^ String.concat ", " deps ^ ")"
+
+let hooks_base_names =
+  [
+    "useEffect";
+    "useLayoutEffect";
+    "useInsertionEffect";
+    "useCallback";
+    "useMemo";
+  ]
+
+let parse_hook_name (name : string) : (string * string * int option) option =
+  let prefixes = [ "React."; "" ] in
+  let try_parse prefix base =
+    let full_base = prefix ^ base in
+    if starts_with full_base name then
+      let suffix =
+        String.sub name (String.length full_base)
+          (String.length name - String.length full_base)
+      in
+      match suffix with
+      | "" -> Some (prefix, base, None)
+      | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" ->
+          Some (prefix, base, Some (int_of_string suffix))
+      | _ -> None
+    else None
+  in
+  let all_combinations =
+    List.concat_map
+      (fun base -> List.map (fun prefix -> (prefix, base)) prefixes)
+      hooks_base_names
+  in
+  List.find_map (fun (prefix, base) -> try_parse prefix base) all_combinations
+
+let make_hook_name ~prefix ~base ~variant =
+  prefix ^ base ^ string_of_int variant
 
 let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
     : Driver.Lint_error.t option =
   match e.pexp_desc with
-  | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args) ->
+  | Pexp_apply
+      (({ pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ } as
+        _fn_expr),
+       args) ->
       let name = Longident.name lident in
       if is_hook_with_deps name then
         let deps_arg = List.nth_opt args 1 in
@@ -341,10 +386,51 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
               | Some (_, deps_expr) -> deps_expr.pexp_loc
               | None -> e.pexp_loc
             in
+            let all_deps = dependencies_names @ missing_deps_unique in
+            let total_dep_count = List.length all_deps in
             if !enable_corrections_flag then begin
-              let all_deps = dependencies_names @ missing_deps_unique in
-              let corrected_str = format_deps_array all_deps in
-              Driver.register_correction ~loc:deps_loc ~repl:corrected_str
+              let hook_info = parse_hook_name name in
+              match deps_arg with
+              | None -> (
+                  match (hook_info, List.nth_opt args 0) with
+                  | Some (prefix, base, current_variant), Some (_, callback_expr) ->
+                      let needs_rename =
+                        match current_variant with
+                        | None -> true
+                        | Some n -> n <> total_dep_count
+                      in
+                      if needs_rename then
+                        let callback_str =
+                          Format.asprintf "%a" Pprintast.expression
+                            callback_expr
+                        in
+                        let new_name =
+                          make_hook_name ~prefix ~base ~variant:total_dep_count
+                        in
+                        let corrected_deps = format_deps all_deps in
+                        let full_correction =
+                          Printf.sprintf "%s (%s) %s" new_name callback_str
+                            corrected_deps
+                        in
+                        Driver.register_correction ~loc:e.pexp_loc
+                          ~repl:full_correction
+                  | _ -> ())
+              | Some _ ->
+                  let corrected_deps = format_deps all_deps in
+                  Driver.register_correction ~loc:deps_loc ~repl:corrected_deps;
+                  (match hook_info with
+                  | Some (prefix, base, current_variant) ->
+                      let needs_rename =
+                        match current_variant with
+                        | None -> true
+                        | Some n -> n <> total_dep_count
+                      in
+                      if needs_rename then
+                        let new_name =
+                          make_hook_name ~prefix ~base ~variant:total_dep_count
+                        in
+                        Driver.register_correction ~loc:fn_loc ~repl:new_name
+                  | None -> ())
             end;
             let is_reason = is_reason_file ctx in
             let msg =
@@ -373,10 +459,6 @@ let exhaustive_deps_linter (ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) : Driver.Lint_error.t list =
   if !disable_exhaustive_deps_flag then []
   else (find_missing_deps ctx)#structure structure []
-
-let starts_with affix str =
-  let start = try String.sub str 0 (String.length affix) with _ -> "" in
-  start = affix
 
 let get_name longident =
   match longident with Lident l -> Some l | Ldot (_, l) -> Some l | _ -> None
