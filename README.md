@@ -40,7 +40,7 @@ let make = (~randomProp) => {
 With this ppx, it will produce the following warning:
 
 ```bash
- 6 | ..React.useEffect1(
+ 6 |   React.useEffect1(
  7 |     () => {
  8 |       if (randomProp) {
  9 |         setShow(_ => !show);

@@ -334,9 +334,9 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
     : Driver.Lint_error.t option =
   match e.pexp_desc with
   | Pexp_apply
-      (({ pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ } as
-        _fn_expr),
-       args) ->
+      ( ({ pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ } as
+         _fn_expr),
+        args ) ->
       let name = Longident.name lident in
       if is_hook_with_deps name then
         let deps_arg = List.nth_opt args 1 in
@@ -393,7 +393,8 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
               match deps_arg with
               | None -> (
                   match (hook_info, List.nth_opt args 0) with
-                  | Some (prefix, base, current_variant), Some (_, callback_expr) ->
+                  | Some (prefix, base, current_variant), Some (_, callback_expr)
+                    ->
                       let needs_rename =
                         match current_variant with
                         | None -> true
@@ -415,10 +416,10 @@ let check_hook_deps (ctx : Expansion_context.Base.t) (e : Parsetree.expression)
                         Driver.register_correction ~loc:e.pexp_loc
                           ~repl:full_correction
                   | _ -> ())
-              | Some _ ->
+              | Some _ -> (
                   let corrected_deps = format_deps all_deps in
                   Driver.register_correction ~loc:deps_loc ~repl:corrected_deps;
-                  (match hook_info with
+                  match hook_info with
                   | Some (prefix, base, current_variant) ->
                       let needs_rename =
                         match current_variant with
