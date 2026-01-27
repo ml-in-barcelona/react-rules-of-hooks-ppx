@@ -133,15 +133,29 @@ This ppx can generate `.ppx-corrected` files with suggested fixes for missing de
 ```clojure
 (preprocess (pps reason-react react-rules-of-hooks-ppx -corrections))
 ```
-
 When enabled, running the build will show a diff with the suggested fix:
 
-```diff
--    [||]
-+    [| value |]
+```reason
+[@react.component]
+let make = (~dep1) => {
+  React.useEffect0(() => {
+    Js.log(dep1);
+    None;
+  });
+  <span />;
+};
 ```
 
-You can then use `dune promote` to accept the corrections.
+```diff
+-  React.useEffect0(() => {
++  React.useEffect1(() => {
+    Js.log(dep1);
+    None;
+-  });
++  }, [| dep1 |]);
+```
+
+You can then run `dune promote` to accept the corrections.
 
 ## Issues
 
