@@ -13,7 +13,7 @@ Without the -corrections flag, only the warning should appear (no diff):
                                                                       ]
 
 With the -corrections flag, the diff should appear with properly formatted deps array:
-  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^\+.*\[|^\-.*\[" | head -2
+  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*\[" | head -2
   -  let _memoized = React.useMemo1 (fun () -> value + 1) [||] in
   +  let _memoized = React.useMemo1 (fun () -> value + 1) [| value |] in
 
