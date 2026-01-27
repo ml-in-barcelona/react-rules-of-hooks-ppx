@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Improve `-corrections` according to the reason-react interface
+
 ## 1.0.0
 
 - Detect hooks called conditionally, in loops, or in nested functions
