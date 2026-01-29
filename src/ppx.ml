@@ -49,14 +49,13 @@ let unique_strings list =
   List.rev acc_rev
 
 let find_duplicates list =
-  let _seen, dups_rev =
-    List.fold_left
-      (fun (seen, dups_rev) item ->
-        if StringSet.mem item seen then (seen, item :: dups_rev)
-        else (StringSet.add item seen, dups_rev))
-      (StringSet.empty, []) list
+  let rec go seen dups = function
+    | [] -> StringSet.elements dups
+    | x :: xs ->
+        if StringSet.mem x seen then go seen (StringSet.add x dups) xs
+        else go (StringSet.add x seen) dups xs
   in
-  List.rev dups_rev |> unique_strings
+  go StringSet.empty StringSet.empty list
 
 let unique_locations list =
   let _seen, acc_rev =
