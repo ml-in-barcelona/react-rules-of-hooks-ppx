@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make () =
   >   React.useEffect1
   >     (fun () ->
@@ -7,6 +7,7 @@
   >     [||];
   >   div
   > EOF
+  $ mlx-pp -print-ml input.mlx > input.ml
 
 Nested callback parameters should NOT trigger missing deps (item is local to callback)
   $ ../src/standalone.exe input.ml 2>&1

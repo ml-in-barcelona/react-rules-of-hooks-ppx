@@ -1,6 +1,6 @@
 Test that the -disable-order-of-hooks flag disables order of hooks checking
 
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let useMouseHook () = ()
   > 
   > let[@react.component] make ~randomProp =
@@ -8,9 +8,11 @@ Test that the -disable-order-of-hooks flag disables order of hooks checking
   >   div
   > EOF
 
+  $ mlx-pp -print-ml input.mlx > input.ml
+
 Without the flag, the conditional hooks error should appear:
 
-  $ ../src/standalone.exe input.ml 2>&1 || true
+  $ ../src/standalone.exe input.ml
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()

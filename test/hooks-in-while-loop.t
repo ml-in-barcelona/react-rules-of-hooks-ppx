@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make ~condition =
   >   let i = ref 0 in
   >   while !i < 10 do
@@ -8,7 +8,9 @@
   >   div
   > EOF
 
-  $ ../src/standalone.exe input.ml 2>&1 || true
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe input.ml
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~condition =

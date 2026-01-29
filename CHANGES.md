@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Performance improvements: use Set for O(log n) lookups, single-pass AST analysis, caching
 - Add `REACT_HOOKS_PPX_TIMING` env var to print timing diagnostics
 
 ## 1.0.0

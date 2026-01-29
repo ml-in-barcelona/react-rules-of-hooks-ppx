@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make ~someProp =
   >   let (state, _) = React.useState (fun () -> 0) in
   >   React.useEffect2
@@ -6,6 +6,7 @@
   >     (someProp, state);
   >   div
   > EOF
+  $ mlx-pp -print-ml input.mlx > input.ml
 
 Correct dependencies should not trigger any error
   $ ../src/standalone.exe input.ml 2>&1

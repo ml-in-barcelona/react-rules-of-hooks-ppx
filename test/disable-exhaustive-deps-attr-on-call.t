@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make ~randomProp:(_ : string) =
   >   let show, _setShow = React.useState (fun () -> "sTatE") in
   >   (React.useEffect1
@@ -7,7 +7,9 @@
   >   div
   > EOF
 
-  $ ../src/standalone.exe input.ml 2>&1 || true
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe input.ml
   let make ~randomProp:(_ : string) =
     let (show, _setShow) = React.useState (fun () -> "sTatE") in
     ((React.useEffect1

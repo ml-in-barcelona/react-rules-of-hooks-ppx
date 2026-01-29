@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make () =
   >   React.useEffect1
   >     (fun () ->
@@ -8,6 +8,7 @@
   >     [||];
   >   div
   > EOF
+  $ mlx-pp -print-ml input.mlx > input.ml
 
 Function parameters inside effect should NOT trigger missing deps (x is local to helper)
   $ ../src/standalone.exe input.ml 2>&1

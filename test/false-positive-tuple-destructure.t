@@ -1,4 +1,4 @@
-  $ cat > input.ml << 'EOF'
+  $ cat > input.mlx << 'EOF'
   > let[@react.component] make () =
   >   React.useEffect1
   >     (fun () ->
@@ -9,6 +9,7 @@
   >     [||];
   >   div
   > EOF
+  $ mlx-pp -print-ml input.mlx > input.ml
 
 Tuple destructuring inside effect should NOT trigger missing deps (a, b are local)
   $ ../src/standalone.exe input.ml 2>&1
