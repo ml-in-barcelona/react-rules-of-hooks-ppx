@@ -346,8 +346,8 @@ let extract_static_deps_from_binding (vb : Parsetree.value_binding) :
   else []
 
 let starts_with affix str =
-  let start = try String.sub str 0 (String.length affix) with _ -> "" in
-  start = affix
+  let affix_len = String.length affix in
+  String.length str >= affix_len && String.sub str 0 affix_len = affix
 
 let format_deps (deps : string list) : string =
   match deps with
