@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add test cases inspired by Facebook's eslint-plugin-react-hooks
 - Performance improvements: use Set for O(log n) lookups, single-pass AST analysis, caching
 - Add `REACT_HOOKS_PPX_TIMING` env var to print timing diagnostics
 
