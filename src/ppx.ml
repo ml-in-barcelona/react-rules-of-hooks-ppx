@@ -445,7 +445,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           (* Check for duplicate dependencies *)
           let duplicate_deps = find_duplicates dependencies_names in
           let duplicate_errors =
-            if List.length duplicate_deps > 0 then
+            if duplicate_deps <> [] then
               let duplicates_str =
                 duplicate_deps |> List.map quotes |> String.concat ", "
               in
@@ -468,7 +468,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           in
           let missing_deps_unique = result_without_static |> unique_strings in
           let missing_errors =
-            if List.length missing_deps_unique > 0 then (
+            if missing_deps_unique <> [] then (
               let missing_dependencies =
                 missing_deps_unique |> List.map quotes |> String.concat ", "
               in
@@ -550,7 +550,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
             outer_scope_deps @ external_module_deps |> unique_strings
           in
           let outer_scope_errors =
-            if List.length all_outer_scope > 0 then
+            if all_outer_scope <> [] then
               let deps_str =
                 all_outer_scope |> List.map quotes |> String.concat ", "
               in
