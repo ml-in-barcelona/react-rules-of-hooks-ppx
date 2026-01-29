@@ -39,7 +39,7 @@ let diff list1 list2 =
   List.filter (fun item -> StringSet.mem item diff_set) list1
 
 let unique_strings list =
-  let _seen, acc_rev =
+  let _, acc_rev =
     List.fold_left
       (fun (seen, acc_rev) item ->
         if StringSet.mem item seen then (seen, acc_rev)
@@ -58,7 +58,7 @@ let find_duplicates list =
   go StringSet.empty StringSet.empty list
 
 let unique_locations list =
-  let _seen, acc_rev =
+  let _, acc_rev =
     List.fold_left
       (fun (seen, acc_rev) item ->
         if LocationSet.mem item seen then (seen, acc_rev)
