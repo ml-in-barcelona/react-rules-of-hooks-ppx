@@ -3,7 +3,7 @@
  (public_name react-rules-of-hooks-ppx)
  (modules ppx)
  (kind ppx_rewriter)
- (libraries ppxlib))
+ (libraries ppxlib unix))
 
 (executable
  (name standalone)

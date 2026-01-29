@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- Add `REACT_HOOKS_PPX_TIMING` env var to print timing diagnostics
+
 ## 1.0.0
 
 - Detect hooks called conditionally, in loops, or in nested functions

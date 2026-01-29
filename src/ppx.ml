@@ -4,6 +4,22 @@ let disable_exhaustive_deps_flag = ref false
 let disable_order_of_hooks_flag = ref false
 let enable_corrections_flag = ref false
 
+let timing_enabled =
+  match Sys.getenv_opt "REACT_HOOKS_PPX_TIMING" with
+  | None -> false
+  | Some value ->
+      let value = String.lowercase_ascii value in
+      value = "1" || value = "true" || value = "yes" || value = "on"
+
+let time_execution label f =
+  if timing_enabled then (
+    let start = Unix.gettimeofday () in
+    let result = f () in
+    let elapsed_ms = (Unix.gettimeofday () -. start) *. 1000.0 in
+    Printf.eprintf "[react-rules-of-hooks-ppx] %s: %.3fms\n" label elapsed_ms;
+    result)
+  else f ()
+
 let make_error_stri ~loc msg =
   Ast_builder.Default.pstr_extension ~loc
     (Location.error_extensionf ~loc "%s" msg)
