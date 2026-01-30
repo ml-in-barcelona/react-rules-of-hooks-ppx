@@ -67,7 +67,7 @@ let unique_locations list =
 
 let quotes = Printf.sprintf "'%s'"
 
-type meta = { ids : longident list; values : string list }
+type ident_info = { used_idents : longident list; bound_names : string list }
 
 let rec extract_pattern_names (pattern : Parsetree.pattern) : string list =
   match pattern.ppat_desc with
@@ -255,7 +255,7 @@ let get_idents (expression : Parsetree.expression) =
     | _ -> (ids_rev, values_rev)
   in
   let ids_rev, values_rev = collect expression ([], []) in
-  { ids = List.rev ids_rev; values = List.rev values_rev }
+  { used_idents = List.rev ids_rev; bound_names = List.rev values_rev }
 
 let rec get_function_body (expr : Parsetree.expression) :
     Parsetree.expression option =
@@ -410,19 +410,21 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           in
           let body_idents =
             body_expression |> Option.map get_idents
-            |> Option.value ~default:{ ids = []; values = [] }
+            |> Option.value ~default:{ used_idents = []; bound_names = [] }
           in
           let body_idents_inside_scope =
-            diff (body_idents.ids |> List.map Longident.name) body_idents.values
+            diff
+              (body_idents.used_idents |> List.map Longident.name)
+              body_idents.bound_names
           in
           let dependencies_idents =
             deps_arg
             |> Option.map (fun a -> snd a)
             |> Option.map (fun deps -> get_idents deps)
-            |> Option.value ~default:{ ids = []; values = [] }
+            |> Option.value ~default:{ used_idents = []; bound_names = [] }
           in
           let dependencies_names =
-            dependencies_idents.ids |> List.map Longident.name
+            dependencies_idents.used_idents |> List.map Longident.name
           in
           let deps_loc =
             match deps_arg with
@@ -529,7 +531,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           in
           (* Also check for external module references (like Js.log) *)
           let external_module_deps =
-            dependencies_idents.ids
+            dependencies_idents.used_idents
             |> List.filter_map (fun lid ->
                 match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
             |> unique_strings
