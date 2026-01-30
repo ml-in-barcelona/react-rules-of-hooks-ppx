@@ -263,6 +263,21 @@ let get_idents (expression : Parsetree.expression) =
     | Pexp_lazy expr -> collect expr (ids_rev, values_rev)
     | Pexp_poly (expr, _) -> collect expr (ids_rev, values_rev)
     | Pexp_open (_, expr) -> collect expr (ids_rev, values_rev)
+    | Pexp_letop { let_; ands; body } ->
+        let ids_rev, values_rev = collect let_.pbop_exp (ids_rev, values_rev) in
+        let binding_names = extract_pattern_names let_.pbop_pat in
+        let ids_rev, values_rev =
+          List.fold_left
+            (fun (ids_rev, values_rev) and_op ->
+              let ids_rev, values_rev =
+                collect and_op.pbop_exp (ids_rev, values_rev)
+              in
+              let and_names = extract_pattern_names and_op.pbop_pat in
+              (ids_rev, add_values values_rev and_names))
+            (ids_rev, values_rev) ands
+        in
+        let values_rev = add_values values_rev binding_names in
+        collect body (ids_rev, values_rev)
     | _ -> (ids_rev, values_rev)
   in
   let ids_rev, values_rev = collect expression ([], []) in
