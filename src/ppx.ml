@@ -93,31 +93,23 @@ let rec extract_pattern_names (pattern : Parsetree.pattern) : string list =
   | Ppat_unpack _ -> []
   | Ppat_extension _ -> []
 
+let extract_param_names (params : Parsetree.function_param list) : string list =
+  List.concat_map
+    (fun (p : Parsetree.function_param) ->
+      match p.pparam_desc with
+      | Pparam_val (_, _, pat) -> extract_pattern_names pat
+      | Pparam_newtype _ -> [])
+    params
+
 let rec extract_function_params (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
   | Pexp_function (params, _, Pfunction_body body) ->
-      let param_names =
-        List.concat_map
-          (fun (p : Parsetree.function_param) ->
-            match p.pparam_desc with
-            | Pparam_val (_, _, pat) -> extract_pattern_names pat
-            | Pparam_newtype _ -> [])
-          params
-      in
-      param_names @ extract_function_params body
+      extract_param_names params @ extract_function_params body
   | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-      let param_names =
-        List.concat_map
-          (fun (p : Parsetree.function_param) ->
-            match p.pparam_desc with
-            | Pparam_val (_, _, pat) -> extract_pattern_names pat
-            | Pparam_newtype _ -> [])
-          params
-      in
       let case_params =
         List.concat_map (fun case -> extract_pattern_names case.pc_lhs) cases
       in
-      param_names @ case_params
+      extract_param_names params @ case_params
   | Pexp_constraint (e, _) -> extract_function_params e
   | Pexp_newtype (_, e) -> extract_function_params e
   | _ -> []
@@ -149,26 +141,10 @@ let get_idents (expression : Parsetree.expression) =
         in
         collect expr (ids_rev, values_rev)
     | Pexp_function (params, _, Pfunction_body body) ->
-        let param_names =
-          List.concat_map
-            (fun (p : Parsetree.function_param) ->
-              match p.pparam_desc with
-              | Pparam_val (_, _, pat) -> extract_pattern_names pat
-              | Pparam_newtype _ -> [])
-            params
-        in
-        let values_rev = add_values values_rev param_names in
+        let values_rev = add_values values_rev (extract_param_names params) in
         collect body (ids_rev, values_rev)
     | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-        let param_names =
-          List.concat_map
-            (fun (p : Parsetree.function_param) ->
-              match p.pparam_desc with
-              | Pparam_val (_, _, pat) -> extract_pattern_names pat
-              | Pparam_newtype _ -> [])
-            params
-        in
-        let values_rev = add_values values_rev param_names in
+        let values_rev = add_values values_rev (extract_param_names params) in
         List.fold_left
           (fun (ids_rev, values_rev) case ->
             let case_bindings = extract_pattern_names case.pc_lhs in
