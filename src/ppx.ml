@@ -886,23 +886,15 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                             }
                           else acc
                         in
-                        let acc =
-                          if
-                            not
-                              (hook_context.is_inside_component
-                             || hook_context.is_inside_custom_hook)
-                          then
-                            {
-                              acc with
-                              outside_locations_rev =
-                                t.pexp_loc :: acc.outside_locations_rev;
-                            }
-                          else acc
-                        in
-                        if hook_context.is_inside_jsx then
+                        if
+                          not
+                            (hook_context.is_inside_component
+                           || hook_context.is_inside_custom_hook)
+                        then
                           {
                             acc with
-                            context = { acc.context with is_inside_jsx = false };
+                            outside_locations_rev =
+                              t.pexp_loc :: acc.outside_locations_rev;
                           }
                         else acc
                     | _ -> acc
