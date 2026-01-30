@@ -2,7 +2,7 @@
   > let useMouseHook () = ()
   > 
   > let[@react.component] make ~randomProp =
-  >   if randomProp = "state" then ((useMouseHook ())[@reason.preserve_braces ]);
+  >   if randomProp = "state" then useMouseHook ();
   >   div
   > EOF
 
@@ -12,6 +12,5 @@
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
-  let make ~randomProp =
-    if randomProp = "state" then ((useMouseHook ())[@reason.preserve_braces ]);
-    div[@@react.component ]
+  let make ~randomProp = if randomProp = "state" then useMouseHook (); div
+    [@@react.component ]
