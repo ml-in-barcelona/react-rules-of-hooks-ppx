@@ -33,10 +33,8 @@ let make_error_stri ~loc msg =
     []
 
 let diff list1 list2 =
-  let list1_set = StringSet.of_list list1 in
   let list2_set = StringSet.of_list list2 in
-  let diff_set = StringSet.diff list1_set list2_set in
-  List.filter (fun item -> StringSet.mem item diff_set) list1
+  List.filter (fun item -> not (StringSet.mem item list2_set)) list1
 
 let unique_strings list =
   let _, acc_rev =
