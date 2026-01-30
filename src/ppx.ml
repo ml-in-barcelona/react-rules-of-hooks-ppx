@@ -719,6 +719,9 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                       }
                     else acc
                   in
+                  let entering_new_scope =
+                    is_component_binding || is_custom_hook_binding
+                  in
                   let acc_for_binding =
                     if is_function_binding then
                       if is_component_binding then
@@ -730,6 +733,7 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                               is_inside_component = true;
                               is_inside_custom_hook = false;
                             };
+                          static_deps = StringSet.empty;
                         }
                       else if is_custom_hook_binding then
                         {
@@ -740,6 +744,7 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                               is_inside_component = false;
                               is_inside_custom_hook = true;
                             };
+                          static_deps = StringSet.empty;
                         }
                       else
                         {
@@ -756,7 +761,9 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                   let acc_after = super#value_binding t acc_for_binding in
                   {
                     acc with
-                    static_deps = acc_after.static_deps;
+                    static_deps =
+                      (if entering_new_scope then acc.static_deps
+                       else acc_after.static_deps);
                     outer_scope_bindings = acc_after.outer_scope_bindings;
                     lint_errors_rev = acc_after.lint_errors_rev;
                     conditional_locations_rev =
