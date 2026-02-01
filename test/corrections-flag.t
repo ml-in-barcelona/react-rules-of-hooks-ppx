@@ -26,9 +26,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   div
   > EOF
   $ mlx-pp -print-ml input.mlx > input.ml
-  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
-  -let make ~dep1 = React.useEffect0 (fun () -> Js.log dep1; None); div[@@react.component
-  +let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [| dep1 |]; div[@@react.component
+  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect" | sed 's/  / /g; s/\[@@react.component$//'
+  -let make ~dep1 = React.useEffect0 (fun () -> Js.log dep1; None); div
+  +let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [| dep1 |]; div
 
 0 -> 1 deps: empty array becomes single-element array
   $ cat > input.mlx << 'EOF'
@@ -37,7 +37,7 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   div
   > EOF
   $ mlx-pp -print-ml input.mlx > input.ml
-  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
+  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect" | sed 's/  / /g; s/\[@@react.component$//'
   -let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [||]; div
   +let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [| dep1 |]; div
 
