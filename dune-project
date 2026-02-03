@@ -31,7 +31,7 @@
   (melange :with-dev-setup)
   (ocamlformat :with-dev-setup)
   (ocaml-lsp-server :with-dev-setup)
-  (mlx :with-dev-setup)
+  (mlx (or :with-test :with-dev-setup))
   (ocamlformat-mlx :with-dev-setup)
   (ocamlmerlin-mlx :with-dev-setup)
 ))

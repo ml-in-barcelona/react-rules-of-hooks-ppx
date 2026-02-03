@@ -2,6 +2,7 @@
 
 ## 1.1.0
 
+- [CHORE] Add mlx as `:with-test` and `:with-dev-setup` (previously only `:with-dev-setup`)
 - [FIX] Add support for snake_case hooks (`use_state`, `use_effect`, `use_custom_hook`)
 - [FIX] SVG `<use>` element no longer incorrectly flagged as a hook (JSX elements excluded from hook detection)
 - [FIX] False positive when multiple hooks are defined
