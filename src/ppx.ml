@@ -570,8 +570,7 @@ let is_a_hook_name name =
     && name.[0] = 'u'
     && name.[1] = 's'
     && name.[2] = 'e'
-    && name.[3] >= 'A'
-    && name.[3] <= 'Z'
+    && ((name.[3] >= 'A' && name.[3] <= 'Z') || name.[3] = '_')
 
 let is_a_hook longident =
   match get_name longident with

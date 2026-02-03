@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] Add support for snake_case hooks (`use_state`, `use_effect`, `use_custom_hook`)
 - [FIX] SVG `<use>` element no longer incorrectly flagged as a hook (JSX elements excluded from hook detection)
 - [FIX] False positive when multiple hooks are defined
 - [FIX] Hooks name can be "use"
