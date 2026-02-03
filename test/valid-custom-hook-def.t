@@ -7,6 +7,7 @@
   >   let _ = useMyCustomHook () in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Custom hook definitions should allow hooks inside (useX naming convention)

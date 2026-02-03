@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 1.1.0
 
 - [FIX] Add support for snake_case hooks (`use_state`, `use_effect`, `use_custom_hook`)
 - [FIX] SVG `<use>` element no longer incorrectly flagged as a hook (JSX elements excluded from hook detection)
