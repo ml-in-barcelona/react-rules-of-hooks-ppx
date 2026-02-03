@@ -82,7 +82,7 @@ Error: Hooks can't be called conditionally and must be called at the top-level o
 ## Install
 
 ```bash
-opam install react-rules-of-hooks-ppx --save-dev
+opam install react-rules-of-hooks-ppx
 ```
 
 Add the ppx into the dune files
