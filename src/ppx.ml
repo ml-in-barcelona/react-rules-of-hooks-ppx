@@ -781,39 +781,56 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                     }
                   else acc
                 in
+                let restore_context original_ctx acc =
+                  { acc with context = original_ctx }
+                in
                 let acc =
                   match t.pexp_desc with
                   | Pexp_match (expr, cases) ->
                       let acc = self#expression expr acc in
-                      List.fold_left
-                        (fun acc case ->
-                          self#expression case.pc_rhs (mark_conditional acc))
-                        acc cases
+                      let acc =
+                        List.fold_left
+                          (fun acc case ->
+                            self#expression case.pc_rhs (mark_conditional acc))
+                          acc cases
+                      in
+                      restore_context hook_context acc
                   | Pexp_try (expr, cases) ->
                       let acc = self#expression expr (mark_conditional acc) in
-                      List.fold_left
-                        (fun acc case ->
-                          self#expression case.pc_rhs (mark_conditional acc))
-                        acc cases
+                      let acc =
+                        List.fold_left
+                          (fun acc case ->
+                            self#expression case.pc_rhs (mark_conditional acc))
+                          acc cases
+                      in
+                      restore_context hook_context acc
                   | Pexp_while (cond, expr) ->
                       let acc = self#expression cond acc in
-                      self#expression expr (mark_conditional acc)
+                      let acc = self#expression expr (mark_conditional acc) in
+                      restore_context hook_context acc
                   | Pexp_for (_, start_expr, end_expr, _, body) ->
                       let acc = self#expression start_expr acc in
                       let acc = self#expression end_expr acc in
-                      self#expression body (mark_conditional acc)
-                  | Pexp_ifthenelse (if_expr, then_expr, else_expr) -> (
+                      let acc = self#expression body (mark_conditional acc) in
+                      restore_context hook_context acc
+                  | Pexp_ifthenelse (if_expr, then_expr, else_expr) ->
                       let acc = self#expression if_expr acc in
                       let acc =
                         self#expression then_expr (mark_conditional acc)
                       in
-                      match else_expr with
-                      | Some expr -> self#expression expr (mark_conditional acc)
-                      | None -> acc)
+                      let acc =
+                        match else_expr with
+                        | Some expr ->
+                            self#expression expr (mark_conditional acc)
+                        | None -> acc
+                      in
+                      restore_context hook_context acc
                   | Pexp_lazy expr ->
-                      self#expression expr (mark_conditional acc)
+                      let acc = self#expression expr (mark_conditional acc) in
+                      restore_context hook_context acc
                   | Pexp_assert expr ->
-                      self#expression expr (mark_conditional acc)
+                      let acc = self#expression expr (mark_conditional acc) in
+                      restore_context hook_context acc
                   | Pexp_apply
                       ( {
                           pexp_desc =
@@ -821,16 +838,16 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                           _;
                         },
                         args ) ->
-                      List.fold_left
-                        (fun acc (_, arg_expr) ->
-                          self#expression arg_expr (mark_conditional acc))
-                        acc args
+                      let acc =
+                        List.fold_left
+                          (fun acc (_, arg_expr) ->
+                            self#expression arg_expr (mark_conditional acc))
+                          acc args
+                      in
+                      restore_context hook_context acc
                   | Pexp_apply
                       ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
-                    when is_hook_with_deps (Longident.name lident) -> (
-                      (* Hooks like useEffect/useMemo/useCallback: their callback
-                       should be treated as conditional context since hooks
-                       can't be called inside them *)
+                    when is_hook_with_deps (Longident.name lident) ->
                       let callback_arg = List.nth_opt args 0 in
                       let deps_arg = List.nth_opt args 1 in
                       let acc =
@@ -839,9 +856,12 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                             self#expression callback_expr (mark_conditional acc)
                         | None -> acc
                       in
-                      match deps_arg with
-                      | Some (_, deps_expr) -> self#expression deps_expr acc
-                      | None -> acc)
+                      let acc =
+                        match deps_arg with
+                        | Some (_, deps_expr) -> self#expression deps_expr acc
+                        | None -> acc
+                      in
+                      restore_context hook_context acc
                   | _ -> super#expression t acc
                 in
                 let acc =
