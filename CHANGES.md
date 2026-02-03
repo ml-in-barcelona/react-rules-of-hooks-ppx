@@ -3,10 +3,11 @@
 ## Unreleased
 
 - [FIX] False positive when multiple hooks are defined
+- [FIX] Hooks name can be "use"
 - [FIX] Fix static deps scope leaking between components (useState setters, useReducer dispatchers, useRef results now properly scoped per component)
 - [FIX] JSX context reset bug where multiple hooks in the same JSX element weren't all flagged as violations
 - [FEAT] Add `Pexp_letop` support for monadic `let+`/`and+` syntax in exhaustive deps checking
-- [TEST] Add test cases inspired by Facebook's eslint-plugin-react-hooks
+- [TEST] Add test cases inspired by React's eslint-plugin-react-hooks
 - [FEAT] Add `REACT_HOOKS_PPX_TIMING` env var to print timing diagnostics
 - [FIX] Use Set for O(log n) lookups, single-pass AST analysis, caching
 - [FIX] Simplify diff function
