@@ -562,17 +562,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
 let get_name longident =
   match longident with Lident l -> Some l | Ldot (_, l) -> Some l | _ -> None
 
-let is_capital_letter c = c >= 'A' && c <= 'Z'
-
-let is_a_hook_name name =
-  let len = String.length name in
-  if len < 3 then false
-  else if len = 3 then name = "use"
-  else
-    starts_with "use" name
-    &&
-    let fourth_char = String.get name 3 in
-    is_capital_letter fourth_char
+let is_a_hook_name name = starts_with "use" name
 
 let is_a_hook longident =
   match get_name longident with
