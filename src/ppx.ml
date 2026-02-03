@@ -840,6 +840,26 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                           acc args
                       in
                       restore_context hook_context acc
+                  | Pexp_fun (_, default_arg, pattern, body) ->
+                      let saved_jsx_context = hook_context.is_inside_jsx in
+                      let acc =
+                        match default_arg with
+                        | Some expr -> self#expression expr acc
+                        | None -> acc
+                      in
+                      let acc = self#pattern pattern acc in
+                      let acc_for_body =
+                        {
+                          acc with
+                          context =
+                            {
+                              acc.context with
+                              is_inside_jsx = saved_jsx_context;
+                            };
+                        }
+                      in
+                      let acc = self#expression body acc_for_body in
+                      restore_context hook_context acc
                   | Pexp_apply
                       ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
                     when is_hook_with_deps (Longident.name lident) ->
