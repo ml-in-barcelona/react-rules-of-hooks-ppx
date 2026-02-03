@@ -568,12 +568,24 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
 let get_name longident =
   match longident with Lident l -> Some l | Ldot (_, l) -> Some l | _ -> None
 
-let is_a_hook_name name = starts_with "use" name
+let is_a_hook_name name =
+  let len = String.length name in
+  if len = 3 then name = "use"
+  else
+    len >= 4
+    && name.[0] = 'u'
+    && name.[1] = 's'
+    && name.[2] = 'e'
+    && name.[3] >= 'A'
+    && name.[3] <= 'Z'
 
 let is_a_hook longident =
   match get_name longident with
   | Some name -> is_a_hook_name name
   | None -> false
+
+let contains_jsx (attrs : attributes) =
+  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = "JSX")
 
 let has_any_hooks (structure : Parsetree.structure) : bool =
   let exception Found in
@@ -584,7 +596,7 @@ let has_any_hooks (structure : Parsetree.structure) : bool =
       method! expression e =
         match e.pexp_desc with
         | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _)
-          when is_a_hook lident ->
+          when is_a_hook lident && not (contains_jsx e.pexp_attributes) ->
             raise Found
         | _ -> super#expression e
     end
@@ -618,9 +630,6 @@ type analysis = {
 
 let has_attribute name attrs =
   attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = name)
-
-let contains_jsx (attrs : attributes) =
-  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = "JSX")
 
 let analysis_cache : (string, analysis) Hashtbl.t = Hashtbl.create 16
 
@@ -886,7 +895,8 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                     | Pexp_apply
                         ( { pexp_desc = Pexp_ident { txt = lident; _ }; _ },
                           _args )
-                      when is_a_hook lident ->
+                      when is_a_hook lident
+                           && not (contains_jsx t.pexp_attributes) ->
                         let acc =
                           if
                             hook_context.is_inside_conditional
