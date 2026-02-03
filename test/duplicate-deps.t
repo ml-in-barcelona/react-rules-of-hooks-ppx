@@ -5,6 +5,7 @@
   >     (someProp, someProp);
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Duplicate dependencies should warn (same dep listed twice)
@@ -22,6 +23,7 @@ Duplicate dependencies should warn (same dep listed twice)
   >     [| someProp; someProp |];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Array syntax with duplicates

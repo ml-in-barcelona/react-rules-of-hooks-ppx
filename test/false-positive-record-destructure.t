@@ -11,6 +11,7 @@
   >     [||];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Record destructuring inside effect should NOT trigger missing deps (name, age are local)

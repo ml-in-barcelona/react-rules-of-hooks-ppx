@@ -6,6 +6,7 @@
   >     [| state |];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 setState from useState should be omittable from deps (it's stable)
@@ -24,6 +25,7 @@ setState from useState should be omittable from deps (it's stable)
   >   );
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 useRef result should be omittable from deps (ref is stable, ref.current is mutable)
@@ -41,6 +43,7 @@ useRef result should be omittable from deps (ref is stable, ref.current is mutab
   >     [| state |];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 dispatch from useReducer should be omittable from deps (it's stable)

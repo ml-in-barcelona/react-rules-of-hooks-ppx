@@ -9,6 +9,7 @@
   >     [||];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Tuple destructuring inside effect should NOT trigger missing deps (a, b are local)

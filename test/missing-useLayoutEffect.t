@@ -6,6 +6,7 @@
   >     [|show|];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 useLayoutEffect should check exhaustive deps like useEffect
