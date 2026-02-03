@@ -576,8 +576,7 @@ let is_a_hook_name name =
     && name.[0] = 'u'
     && name.[1] = 's'
     && name.[2] = 'e'
-    && name.[3] >= 'A'
-    && name.[3] <= 'Z'
+    && ((name.[3] >= 'A' && name.[3] <= 'Z') || name.[3] = '_')
 
 let is_a_hook longident =
   match get_name longident with
@@ -855,14 +854,22 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                           acc args
                       in
                       restore_context hook_context acc
-                  | Pexp_fun (_, default_arg, pattern, body) ->
+                  | Pexp_function (params, _, func_body) ->
                       let saved_jsx_context = hook_context.is_inside_jsx in
                       let acc =
-                        match default_arg with
-                        | Some expr -> self#expression expr acc
-                        | None -> acc
+                        List.fold_left
+                          (fun acc (p : Parsetree.function_param) ->
+                            match p.pparam_desc with
+                            | Pparam_val (_, default_arg, pattern) ->
+                                let acc =
+                                  match default_arg with
+                                  | Some expr -> self#expression expr acc
+                                  | None -> acc
+                                in
+                                self#pattern pattern acc
+                            | Pparam_newtype _ -> acc)
+                          acc params
                       in
-                      let acc = self#pattern pattern acc in
                       let acc_for_body =
                         {
                           acc with
@@ -873,7 +880,15 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                             };
                         }
                       in
-                      let acc = self#expression body acc_for_body in
+                      let acc =
+                        match func_body with
+                        | Pfunction_body body ->
+                            self#expression body acc_for_body
+                        | Pfunction_cases (cases, _, _) ->
+                            List.fold_left
+                              (fun acc case -> self#case case acc)
+                              acc_for_body cases
+                      in
                       restore_context hook_context acc
                   | Pexp_apply
                       ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)

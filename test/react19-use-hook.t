@@ -18,4 +18,4 @@ React 19 "use" hook should be detected as a hook
   > EOF
 
   $ ../src/standalone.exe input.ml 2>&1
-  let make ~promise  = let data = use promise in data[@@react.component ]
+  let make ~promise = let data = use promise in data[@@react.component ]
