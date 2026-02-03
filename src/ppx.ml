@@ -93,23 +93,12 @@ let rec extract_pattern_names (pattern : Parsetree.pattern) : string list =
   | Ppat_unpack _ -> []
   | Ppat_extension _ -> []
 
-let extract_param_names (params : Parsetree.function_param list) : string list =
-  List.concat_map
-    (fun (p : Parsetree.function_param) ->
-      match p.pparam_desc with
-      | Pparam_val (_, _, pat) -> extract_pattern_names pat
-      | Pparam_newtype _ -> [])
-    params
-
 let rec extract_function_params (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
-  | Pexp_function (params, _, Pfunction_body body) ->
-      extract_param_names params @ extract_function_params body
-  | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-      let case_params =
-        List.concat_map (fun case -> extract_pattern_names case.pc_lhs) cases
-      in
-      extract_param_names params @ case_params
+  | Pexp_fun (_, _, pat, body) ->
+      extract_pattern_names pat @ extract_function_params body
+  | Pexp_function cases ->
+      List.concat_map (fun case -> extract_pattern_names case.pc_lhs) cases
   | Pexp_constraint (e, _) -> extract_function_params e
   | Pexp_newtype (_, e) -> extract_function_params e
   | _ -> []
@@ -140,11 +129,10 @@ let get_idents (expression : Parsetree.expression) =
             (ids_rev, values_rev) value_bindings
         in
         collect expr (ids_rev, values_rev)
-    | Pexp_function (params, _, Pfunction_body body) ->
-        let values_rev = add_values values_rev (extract_param_names params) in
+    | Pexp_fun (_, _, pat, body) ->
+        let values_rev = add_values values_rev (extract_pattern_names pat) in
         collect body (ids_rev, values_rev)
-    | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-        let values_rev = add_values values_rev (extract_param_names params) in
+    | Pexp_function cases ->
         List.fold_left
           (fun (ids_rev, values_rev) case ->
             let case_bindings = extract_pattern_names case.pc_lhs in
@@ -257,11 +245,17 @@ let get_idents (expression : Parsetree.expression) =
   let ids_rev, values_rev = collect expression ([], []) in
   { used_idents = List.rev ids_rev; bound_names = List.rev values_rev }
 
+let rec get_innermost_body (expr : Parsetree.expression) : Parsetree.expression
+    =
+  match expr.pexp_desc with
+  | Pexp_fun (_, _, _, body) -> get_innermost_body body
+  | _ -> expr
+
 let rec get_function_body (expr : Parsetree.expression) :
     Parsetree.expression option =
   match expr.pexp_desc with
-  | Pexp_function (_, _, Pfunction_body body) -> Some body
-  | Pexp_function (_, _, Pfunction_cases _) -> Some expr
+  | Pexp_fun (_, _, _, body) -> Some (get_innermost_body body)
+  | Pexp_function _ -> Some expr
   | Pexp_constraint (e, _) -> get_function_body e
   | _ -> None
 

@@ -10,8 +10,8 @@
 Functions starting with _use are not hooks and should be allowed in conditionals
   $ ../src/standalone.exe input.ml 2>&1
   let _useNotAHook () = ()
-  let make ~condition = if condition then _useNotAHook (); div[@@react.component
-                                                                ]
+  let make ~condition  = if condition then _useNotAHook (); div[@@react.component
+                                                                 ]
 
   $ cat > input.mlx << 'EOF'
   > let use_not_a_hook () = ()
@@ -25,8 +25,8 @@ Functions starting with _use are not hooks and should be allowed in conditionals
 Functions with use_ (underscore after use) should not be hooks
   $ ../src/standalone.exe input.ml 2>&1
   let use_not_a_hook () = ()
-  let make ~condition = if condition then use_not_a_hook (); div[@@react.component
-                                                                  ]
+  let make ~condition  = if condition then use_not_a_hook (); div[@@react.component
+                                                                   ]
 
   $ cat > input.mlx << 'EOF'
   > let userFetch () = ()
@@ -40,4 +40,5 @@ Functions with use_ (underscore after use) should not be hooks
 Functions starting with 'user' (not 'use') should not be hooks
   $ ../src/standalone.exe input.ml 2>&1
   let userFetch () = ()
-  let make ~condition = if condition then userFetch (); div[@@react.component ]
+  let make ~condition  = if condition then userFetch (); div[@@react.component
+                                                              ]
