@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- [FIX] SVG `<use>` element no longer incorrectly flagged as a hook (JSX elements excluded from hook detection)
 - [FIX] False positive when multiple hooks are defined
 - [FIX] Hooks name can be "use"
 - [FIX] Fix static deps scope leaking between components (useState setters, useReducer dispatchers, useRef results now properly scoped per component)
