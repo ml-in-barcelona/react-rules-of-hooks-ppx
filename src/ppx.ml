@@ -932,29 +932,35 @@ let analyze_structure (ctx : Expansion_context.Base.t)
                           _args )
                       when is_a_hook lident
                            && not (contains_jsx t.pexp_attributes) ->
-                        let acc =
+                        let has_disable_order_attr =
+                          has_attribute "disable_order_of_hooks"
+                            t.pexp_attributes
+                        in
+                        if has_disable_order_attr then acc
+                        else
+                          let acc =
+                            if
+                              hook_context.is_inside_conditional
+                              || hook_context.is_inside_jsx
+                            then
+                              {
+                                acc with
+                                conditional_locations_rev =
+                                  t.pexp_loc :: acc.conditional_locations_rev;
+                              }
+                            else acc
+                          in
                           if
-                            hook_context.is_inside_conditional
-                            || hook_context.is_inside_jsx
+                            not
+                              (hook_context.is_inside_component
+                             || hook_context.is_inside_custom_hook)
                           then
                             {
                               acc with
-                              conditional_locations_rev =
-                                t.pexp_loc :: acc.conditional_locations_rev;
+                              outside_locations_rev =
+                                t.pexp_loc :: acc.outside_locations_rev;
                             }
                           else acc
-                        in
-                        if
-                          not
-                            (hook_context.is_inside_component
-                           || hook_context.is_inside_custom_hook)
-                        then
-                          {
-                            acc with
-                            outside_locations_rev =
-                              t.pexp_loc :: acc.outside_locations_rev;
-                          }
-                        else acc
                     | _ -> acc
                   else acc
                 in
