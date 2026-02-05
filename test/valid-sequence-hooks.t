@@ -5,6 +5,7 @@
   >   Js.log state;
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Hooks in sequence at top level of component should be valid

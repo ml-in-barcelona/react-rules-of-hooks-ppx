@@ -7,6 +7,7 @@
   >     [| globalValue |];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Module-level values in deps should warn as unnecessary
@@ -26,6 +27,7 @@ Module-level values in deps should warn as unnecessary
   >     [| Js.log |];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 External module values (like Js.log) in deps are unnecessary

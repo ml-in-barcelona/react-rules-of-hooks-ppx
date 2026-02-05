@@ -3,6 +3,7 @@
   > 
   > let[@react.component] make () = div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Namespace hooks (React.useState) at top level should error
@@ -17,6 +18,7 @@ Namespace hooks (React.useState) at top level should error
   > 
   > let[@react.component] make () = div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 React.useEffect at top level should error

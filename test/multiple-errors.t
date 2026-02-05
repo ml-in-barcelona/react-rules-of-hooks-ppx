@@ -10,6 +10,7 @@ This test showcases that multiple errors can be reported at once
   >   if randomProp = "other" then useFoo ();
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
   $ ../src/standalone.exe input.ml

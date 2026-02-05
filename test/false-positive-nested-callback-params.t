@@ -7,6 +7,7 @@
   >     [||];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Nested callback parameters should NOT trigger missing deps (item is local to callback)

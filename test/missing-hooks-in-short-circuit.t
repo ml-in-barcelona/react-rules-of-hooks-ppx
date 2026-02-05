@@ -3,6 +3,7 @@
   >   let _ = condition && (let _ = React.useState (fun () -> 0) in true) in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Hooks inside && or || short-circuit should be detected

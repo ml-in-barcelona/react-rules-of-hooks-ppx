@@ -6,6 +6,7 @@
   >     (someProp, state);
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Correct dependencies should not trigger any error

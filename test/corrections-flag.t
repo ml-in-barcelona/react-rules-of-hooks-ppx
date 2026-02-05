@@ -25,7 +25,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   React.useEffect0 (fun () -> Js.log dep1; None);
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
+
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect" | sed 's/  / /g; s/\[@@react.component$//'
   -let make ~dep1 = React.useEffect0 (fun () -> Js.log dep1; None); div
   +let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [| dep1 |]; div
@@ -36,7 +38,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   React.useEffect1 (fun () -> Js.log dep1; None) [||];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
+
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect" | sed 's/  / /g; s/\[@@react.component$//'
   -let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [||]; div
   +let make ~dep1 = React.useEffect1 (fun () -> Js.log dep1; None) [| dep1 |]; div
@@ -47,7 +51,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   React.useEffect1 (fun () -> Js.log dep1; Js.log dep2; None) [|dep1|];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
+
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
   -  React.useEffect1 (fun () -> Js.log dep1; Js.log dep2; None) [|dep1|]; div
   +  React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; None) (dep1, dep2); div
@@ -58,7 +64,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; None) ((), ());
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
+
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
   -  React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; None) ((), ()); div
   +  React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; None) (dep1, dep2); div
@@ -69,7 +77,9 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   >   React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; Js.log dep3; None) (dep1, dep2);
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
+
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
   -  React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; Js.log dep3; None)
   +  React.useEffect3 (fun () -> Js.log dep1; Js.log dep2; Js.log dep3; None)

@@ -13,6 +13,7 @@
   >   let _ = React.useState (fun () -> 0) in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Hooks outside components or custom hooks should be detected

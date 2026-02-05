@@ -3,6 +3,7 @@
   >   let _callback = React.useCallback1 (fun () -> Js.log value) [||] in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 useCallback should check exhaustive deps

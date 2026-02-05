@@ -3,6 +3,7 @@
   >   let _ = lazy (React.useState (fun () -> 0)) in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Hooks inside lazy expressions should be detected (deferred execution)

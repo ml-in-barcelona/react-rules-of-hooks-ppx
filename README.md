@@ -118,13 +118,29 @@ React.useEffect1(() => {
 (preprocess (pps reason-react react-rules-of-hooks-ppx -disable-exhaustive-deps))
 ```
 
+#### Suppress order-of-hooks warnings locally
+
+If you need to suppress an order-of-hooks warning for a specific case (e.g., test utilities, switch%platform or intentional dynamic hook usage), use the `[@disable_order_of_hooks]` attribute.
+
+**In Reason (.re files):**
+```reason
+if (condition) {
+  [@disable_order_of_hooks]
+  useMyHook();
+};
+```
+
+**In OCaml (.ml files):**
+```ocaml
+if condition then
+  (useMyHook ())[@disable_order_of_hooks]
+```
+
 ##### Disable "Order of Hooks" on the library
 
 ```clojure
 (preprocess (pps reason-react react-rules-of-hooks-ppx -disable-order-of-hooks))
 ```
-
-> **Note:** Unlike exhaustive-deps, there is no per-expression attribute to suppress order-of-hooks warnings. This is intentional - calling hooks outside of components or custom hooks is almost always a bug. If you have a legitimate use case (e.g., test utilities), use the global `-disable-order-of-hooks` flag for that specific library.
 
 #### Enable automatic corrections for missing dependencies
 

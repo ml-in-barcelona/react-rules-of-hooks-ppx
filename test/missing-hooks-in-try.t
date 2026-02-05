@@ -5,6 +5,7 @@
   >     div
   >   with _ -> div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Hooks inside try/catch should be detected as conditional

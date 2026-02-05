@@ -8,6 +8,7 @@
   >     [||];
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Function parameters inside effect should NOT trigger missing deps (x is local to helper)

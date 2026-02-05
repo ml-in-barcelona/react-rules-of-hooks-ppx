@@ -3,6 +3,7 @@
   >   let _memoized = React.useMemo1 (fun () -> value + 1) [||] in
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 useMemo should check exhaustive deps

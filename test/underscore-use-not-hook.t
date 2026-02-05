@@ -5,6 +5,7 @@
   >   if condition then _useNotAHook ();
   >   div
   > EOF
+
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Functions starting with _use are not hooks (underscore prefix)
