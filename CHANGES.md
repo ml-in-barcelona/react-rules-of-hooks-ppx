@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- [FEAT] Support `use` + numbers as a valid hook name
+
 ## 1.1.0
 
 - [FEAT] Disable order of hooks attribute `[@disable_order_of_hooks]`
