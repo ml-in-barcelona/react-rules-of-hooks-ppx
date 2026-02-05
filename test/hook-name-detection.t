@@ -102,3 +102,28 @@ Custom hook with snake_case name
   $ ../src/standalone.exe input.ml 2>&1
   let use_custom_hook () =
     let (state, set_state) = React.useState (fun () -> 0) in (state, set_state)
+
+Custom hooks with numeric suffixes (use0, use1, use10, etc.)
+  $ cat > input.ml << 'EOF'
+  > let use0 fetch = use ~useMemo:React.useMemo1 fetch [||]
+  > let use1 fetch deps = use ~useMemo:React.useMemo1 fetch deps
+  > let use10 fetch deps = use ~useMemo:React.useMemo10 fetch deps
+  > EOF
+
+  $ ../src/standalone.exe input.ml 2>&1
+  let use0 fetch = use ~useMemo:React.useMemo1 fetch [||]
+  let use1 fetch deps = use ~useMemo:React.useMemo1 fetch deps
+  let use10 fetch deps = use ~useMemo:React.useMemo10 fetch deps
+
+Custom hooks with numeric suffixes can call other hooks
+  $ cat > input.ml << 'EOF'
+  > let use10 fetch dependencies =
+  >   let (data, setData) = React.useState (fun () -> None) in
+  >   let fetchCount = React.useRef 0 in
+  >   (data, fetchCount)
+  > EOF
+
+  $ ../src/standalone.exe input.ml 2>&1
+  let use10 fetch dependencies =
+    let (data, setData) = React.useState (fun () -> None) in
+    let fetchCount = React.useRef 0 in (data, fetchCount)
