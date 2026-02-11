@@ -46,7 +46,7 @@ Module-level functions used in effect body without being in deps should not warn
   $ mlx-pp -print-ml input.mlx > input.ml
 
 Module-level values in deps should warn as unnecessary
-(outer scope values don't trigger re-renders when mutated)
+(outer scope values don't trigger re-renders, since they can't be mutated)
   $ ../src/standalone.exe input.ml 2>&1
   [@@@ocaml.ppwarning
     "exhaustive-deps: React.useEffect1 has an unnecessary dependency: 'globalValue'. Outer scope values like 'globalValue' aren't valid dependencies because mutating them doesn't re-render the component.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
