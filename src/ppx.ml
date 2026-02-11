@@ -299,7 +299,6 @@ let suppress_exhaustive_deps_hint ~is_reason =
   else
     "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
 
-(* Helper to check if an expression is a call to a specific hook *)
 let is_hook_call_named hook_names (expr : Parsetree.expression) =
   match expr.pexp_desc with
   | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _) ->
@@ -352,7 +351,7 @@ let hooks_base_names =
     "useMemo";
   ]
 
-let parse_hook_name (name : string) : (string * string * int option) option =
+let decode_hook_name (name : string) : (string * string * int option) option =
   let prefixes = [ "React."; "" ] in
   let try_parse prefix base =
     let full_base = prefix ^ base in
@@ -432,7 +431,6 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
             | None -> e.pexp_loc
           in
           let is_reason = is_reason_file ctx in
-          (* Check for duplicate dependencies *)
           let duplicate_deps = find_duplicates dependencies_names in
           let duplicate_errors =
             if duplicate_deps <> [] then
@@ -452,9 +450,13 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           in
           (* Check for missing dependencies *)
           let result = diff body_idents_inside_scope dependencies_names in
-          (* Filter out static deps (useState setters, useReducer dispatchers, useRef results) *)
           let result_without_static =
-            List.filter (fun dep -> not (StringSet.mem dep static_deps)) result
+            List.filter
+              (fun dep ->
+                not
+                  (StringSet.mem dep static_deps
+                  || StringSet.mem dep outer_scope_bindings))
+              result
           in
           let missing_deps_unique = result_without_static |> unique_strings in
           let missing_errors =
@@ -467,7 +469,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
               in
               let total_dep_count = List.length all_deps in
               if !enable_corrections_flag then begin
-                let hook_info = parse_hook_name name in
+                let hook_info = decode_hook_name name in
                 match deps_arg with
                 | None -> (
                     match (hook_info, List.nth_opt args 0) with

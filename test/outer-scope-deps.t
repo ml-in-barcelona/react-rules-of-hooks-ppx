@@ -1,3 +1,38 @@
+Module-level values used in effect body without being in deps should not warn
+(OCaml values are immutable, so outer scope bindings are referentially stable)
+  $ cat > input.mlx << 'EOF'
+  > let globalValue = 42
+  >
+  > let[@react.component] make () =
+  >   React.useEffect
+  >     (fun () -> Js.log globalValue; None);
+  >   div
+  > EOF
+
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe input.ml 2>&1
+  let globalValue = 42
+  let make () = React.useEffect (fun () -> Js.log globalValue; None); div
+    [@@react.component ]
+
+Module-level functions used in effect body without being in deps should not warn
+  $ cat > input.mlx << 'EOF'
+  > let helper x = x + 1
+  >
+  > let[@react.component] make () =
+  >   React.useEffect
+  >     (fun () -> Js.log (helper 1); None);
+  >   div
+  > EOF
+
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe input.ml 2>&1
+  let helper x = x + 1
+  let make () = React.useEffect (fun () -> Js.log (helper 1); None); div
+    [@@react.component ]
+
   $ cat > input.mlx << 'EOF'
   > let globalValue = 42
   > 
