@@ -548,9 +548,9 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
               in
               let msg =
                 Printf.sprintf
-                  "exhaustive-deps: React Hook %s has %s: %s. Outer scope \
-                   values like %s aren't valid dependencies because mutating \
-                   them doesn't re-render the component.\n\
+                  "exhaustive-deps: %s has %s: %s. Outer scope values like %s \
+                   aren't valid dependencies because mutating them doesn't \
+                   re-render the component.\n\
                    %s"
                   name
                   (if List.length all_outer_scope = 1 then
