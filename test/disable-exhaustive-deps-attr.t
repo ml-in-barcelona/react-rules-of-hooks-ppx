@@ -10,7 +10,7 @@
   $ mlx-pp -print-ml input.mlx > input.ml
 
   $ ../src/standalone.exe input.ml
-  let make ~randomProp:(_ : string)  =
+  let make ~randomProp:(_ : string) =
     let (show, _setShow) = React.useState (fun () -> "sTatE") in
     ((React.useEffect1 (fun () -> Js.log randomProp; None) [|show|])
     [@disable_exhaustive_deps ]);

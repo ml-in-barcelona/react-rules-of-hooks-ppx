@@ -12,5 +12,5 @@
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
-  let make ~randomProp  = if randomProp = "state" then useMouseHook (); div
+  let make ~randomProp = if randomProp = "state" then useMouseHook (); div
     [@@react.component ]

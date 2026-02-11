@@ -3,6 +3,7 @@
 ## Unreleased
 
 - [FEAT] Support `use` + numbers as a valid hook name
+- [FIX] Outer scope bindings (module-level values and functions) no longer trigger missing dependency warnings in exhaustive deps checks
 
 ## 1.1.0
 

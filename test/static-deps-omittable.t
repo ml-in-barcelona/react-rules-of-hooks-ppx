@@ -49,6 +49,6 @@ useRef result should be omittable from deps (ref is stable, ref.current is mutab
 dispatch from useReducer should be omittable from deps (it's stable)
   $ ../src/standalone.exe input.ml 2>&1
   let make () =
-    let (state, dispatch) = React.useReducer (fun _ -> fun action -> action) 0 in
+    let (state, dispatch) = React.useReducer (fun _ action -> action) 0 in
     React.useEffect1 (fun () -> dispatch (state + 1); None) [|state|]; div
     [@@react.component ]

@@ -20,7 +20,7 @@ This test showcases that multiple errors can be reported at once
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
   let useFoo () = ()
-  let make ~randomProp  =
+  let make ~randomProp =
     if randomProp = "state" then useMouseHook ();
     if randomProp = "other" then useFoo ();
     div[@@react.component ]

@@ -14,7 +14,7 @@
 
 Hooks after match/if expressions should be valid (conditional context should not leak)
   $ ../src/standalone.exe input.ml 2>&1
-  let make ~value  =
+  let make ~value =
     let result = match value with | Some x -> x | None -> 0 in
     let (state, _) = React.useState (fun () -> result) in
     let adjusted = if state > 0 then state else 0 in

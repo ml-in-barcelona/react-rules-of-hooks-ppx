@@ -10,6 +10,6 @@ Hooks inside callbacks like List.map should be detected (variable execution coun
 NOTE: This is a known limitation - detecting hooks in arbitrary callbacks requires
 more sophisticated analysis. For v0.1, only JSX callbacks are detected.
   $ ../src/standalone.exe input.ml
-  let make ~items  =
+  let make ~items =
     let _ = List.map (fun _ -> React.useState (fun () -> 0)) items in div
     [@@react.component ]
