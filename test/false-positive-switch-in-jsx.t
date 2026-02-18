@@ -16,7 +16,7 @@ Hook at top level with switch inside JSX for conditional rendering should be val
   $ mlx-pp -print-ml input.mlx > input.ml
 
   $ ../src/standalone.exe input.ml
-  let make ~route ~profile ~org =
+  let make ~route  ~profile  ~org  =
     let currentRoute = (Route.useUrl ()) |> Route.ofUrl in
     let sidebar = ((Sidebar.createElement () ~children:[] ~currentRoute ~org)
       [@JSX ]) in

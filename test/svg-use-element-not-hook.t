@@ -11,7 +11,7 @@ SVG <use> element is not a hook - JSX elements (with [@JSX] attribute) are exclu
   $ mlx-pp -print-ml input.mlx > input.ml
 
   $ ../src/standalone.exe input.ml
-  let make ~svgRef =
+  let make ~svgRef  =
     ((svg ()
         ~children:[((use () ~children:[] ~href:"#icon")
                   [@JSX ]);

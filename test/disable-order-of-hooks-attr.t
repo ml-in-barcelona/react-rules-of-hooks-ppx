@@ -12,7 +12,7 @@ Test that the [@disable_order_of_hooks] attribute disables order of hooks checki
 
   $ ../src/standalone.exe input.ml
   let useMouseHook () = ()
-  let make ~randomProp =
+  let make ~randomProp  =
     if randomProp = "state" then ((useMouseHook ())[@disable_order_of_hooks ]);
     div[@@react.component ]
 
@@ -48,7 +48,7 @@ Test that without the attribute, the error still appears:
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
-  let make ~randomProp = if randomProp = "state" then useMouseHook (); div
+  let make ~randomProp  = if randomProp = "state" then useMouseHook (); div
     [@@react.component ]
 
 Test that the attribute works in switch/match expressions:
@@ -69,7 +69,7 @@ Test that the attribute works in switch/match expressions:
   $ ../src/standalone.exe input4.ml
   let useMouseHook () = ()
   let useKeyboardHook () = ()
-  let make ~inputType =
+  let make ~inputType  =
     (match inputType with
      | "mouse" -> ((useMouseHook ())[@disable_order_of_hooks ])
      | "keyboard" -> ((useKeyboardHook ())[@disable_order_of_hooks ])
@@ -93,6 +93,6 @@ Test that without the attribute in switch, the error appears:
   [%%ocaml.error
     "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
   let useMouseHook () = ()
-  let make ~inputType =
+  let make ~inputType  =
     (match inputType with | "mouse" -> useMouseHook () | _ -> ()); ()[@@react.component
                                                                       ]

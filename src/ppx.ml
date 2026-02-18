@@ -95,24 +95,16 @@ let rec extract_pattern_names (pattern : Parsetree.pattern) : string list =
 
 let rec extract_function_params (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
-  | Pexp_function (params, _, func_body) ->
+  | Pexp_function cases ->
       let param_names =
-        List.concat_map
-          (fun (p : Parsetree.function_param) ->
-            match p.pparam_desc with
-            | Pparam_val (_, _, pat) -> extract_pattern_names pat
-            | Pparam_newtype _ -> [])
-          params
+        List.concat_map (fun case -> extract_pattern_names case.pc_lhs) cases
       in
       let body_names =
-        match func_body with
-        | Pfunction_body body -> extract_function_params body
-        | Pfunction_cases (cases, _, _) ->
-            List.concat_map
-              (fun case -> extract_pattern_names case.pc_lhs)
-              cases
+        List.concat_map (fun case -> extract_function_params case.pc_rhs) cases
       in
       param_names @ body_names
+  | Pexp_fun (_, _, pat, body) ->
+      extract_pattern_names pat @ extract_function_params body
   | Pexp_constraint (e, _) -> extract_function_params e
   | Pexp_newtype (_, e) -> extract_function_params e
   | _ -> []
@@ -143,30 +135,26 @@ let get_idents (expression : Parsetree.expression) =
             (ids_rev, values_rev) value_bindings
         in
         collect expr (ids_rev, values_rev)
-    | Pexp_function (params, _, func_body) -> (
+    | Pexp_function cases ->
+        List.fold_left
+          (fun (ids_rev, values_rev) case ->
+            let case_bindings = extract_pattern_names case.pc_lhs in
+            let values_rev = add_values values_rev case_bindings in
+            let ids_rev, values_rev =
+              match case.pc_guard with
+              | None -> (ids_rev, values_rev)
+              | Some guard -> collect guard (ids_rev, values_rev)
+            in
+            collect case.pc_rhs (ids_rev, values_rev))
+          (ids_rev, values_rev) cases
+    | Pexp_fun (_, default_arg, pat, body) ->
         let ids_rev, values_rev =
-          List.fold_left
-            (fun (ids_rev, values_rev) (p : Parsetree.function_param) ->
-              match p.pparam_desc with
-              | Pparam_val (_, default_arg, pat) ->
-                  let ids_rev, values_rev =
-                    match default_arg with
-                    | Some expr -> collect expr (ids_rev, values_rev)
-                    | None -> (ids_rev, values_rev)
-                  in
-                  (ids_rev, add_values values_rev (extract_pattern_names pat))
-              | Pparam_newtype _ -> (ids_rev, values_rev))
-            (ids_rev, values_rev) params
+          match default_arg with
+          | None -> (ids_rev, values_rev)
+          | Some e -> collect e (ids_rev, values_rev)
         in
-        match func_body with
-        | Pfunction_body body -> collect body (ids_rev, values_rev)
-        | Pfunction_cases (cases, _, _) ->
-            List.fold_left
-              (fun (ids_rev, values_rev) case ->
-                let case_bindings = extract_pattern_names case.pc_lhs in
-                let values_rev = add_values values_rev case_bindings in
-                collect case.pc_rhs (ids_rev, values_rev))
-              (ids_rev, values_rev) cases)
+        let values_rev = add_values values_rev (extract_pattern_names pat) in
+        collect body (ids_rev, values_rev)
     | Pexp_constraint (expr, _) -> collect expr (ids_rev, values_rev)
     | Pexp_newtype (_, expr) -> collect expr (ids_rev, values_rev)
     | Pexp_apply (fn_expr, labeled_expr) ->
@@ -276,14 +264,16 @@ let get_idents (expression : Parsetree.expression) =
 let rec get_innermost_body (expr : Parsetree.expression) : Parsetree.expression
     =
   match expr.pexp_desc with
-  | Pexp_function (_, _, Pfunction_body body) -> get_innermost_body body
+  | Pexp_fun (_, _, _, body) -> get_innermost_body body
+  | Pexp_function [ case ] -> get_innermost_body case.pc_rhs
   | _ -> expr
 
 let rec get_function_body (expr : Parsetree.expression) :
     Parsetree.expression option =
   match expr.pexp_desc with
-  | Pexp_function (_, _, Pfunction_body body) -> Some (get_innermost_body body)
-  | Pexp_function (_, _, Pfunction_cases _) -> Some expr
+  | Pexp_fun (_, _, _, body) -> Some (get_innermost_body body)
+  | Pexp_function [ case ] -> Some (get_innermost_body case.pc_rhs)
+  | Pexp_function _ -> Some expr
   | Pexp_constraint (e, _) -> get_function_body e
   | _ -> None
 
@@ -893,36 +883,27 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                 state args
             in
             restore_context hook_context state
-        | Pexp_function (params, _, func_body) ->
-            let saved_jsx_context = hook_context.is_inside_jsx in
+        | Pexp_function cases ->
             let state =
               List.fold_left
-                (fun state (p : Parsetree.function_param) ->
-                  match p.pparam_desc with
-                  | Pparam_val (_, default_arg, pattern) ->
-                      let state =
-                        match default_arg with
-                        | Some expr -> self#expression expr state
-                        | None -> state
-                      in
-                      self#pattern pattern state
-                  | Pparam_newtype _ -> state)
-                state params
+                (fun state case -> self#case case state)
+                state cases
             in
-            let state_for_body =
-              {
-                state with
-                context =
-                  { state.context with is_inside_jsx = saved_jsx_context };
-              }
-            in
+            restore_context hook_context state
+        | Pexp_fun (_, default_arg, pat, body) ->
+            let saved_jsx = hook_context.is_inside_jsx in
             let state =
-              match func_body with
-              | Pfunction_body body -> self#expression body state_for_body
-              | Pfunction_cases (cases, _, _) ->
-                  List.fold_left
-                    (fun state case -> self#case case state)
-                    state_for_body cases
+              match default_arg with
+              | None -> state
+              | Some e -> self#expression e state
+            in
+            let state = self#pattern pat state in
+            let state =
+              self#expression body
+                {
+                  state with
+                  context = { state.context with is_inside_jsx = saved_jsx };
+                }
             in
             restore_context hook_context state
         | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
