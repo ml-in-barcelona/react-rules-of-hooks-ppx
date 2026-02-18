@@ -410,7 +410,8 @@ let check_duplicate_deps ~is_reason ~deps_loc dependencies_names =
     in
     let msg =
       Printf.sprintf
-        "exhaustive-deps: Duplicate dependency %s in the dependency array.\n%s"
+        "exhaustive-deps: Duplicate %s %s in the dependency array.\n%s"
+        (if List.length duplicate_deps = 1 then "dependency" else "dependencies")
         duplicates_str
         (suppress_exhaustive_deps_hint ~is_reason)
     in
@@ -463,12 +464,14 @@ let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
 
 let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
     ~callback_arg ~(static_deps : StringSet.t)
-    ~(component_scope_bindings : StringSet.t) ~dependencies_names
+    ~(component_scope_bindings : StringSet.t)
+    ~(qualified_body_idents : StringSet.t) ~dependencies_names
     ~body_idents_inside_scope =
   let missing =
     diff body_idents_inside_scope dependencies_names
     |> List.filter (fun dep ->
         StringSet.mem dep component_scope_bindings
+        && (not (StringSet.mem dep qualified_body_idents))
         && not (StringSet.mem dep static_deps))
     |> unique_strings
   in
@@ -481,7 +484,9 @@ let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
       register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc
         ~deps_arg ~callback_arg ~all_deps ~total_dep_count;
     let msg =
-      Printf.sprintf "exhaustive-deps: Missing %s in the dependency array.\n%s"
+      Printf.sprintf
+        "exhaustive-deps: Missing %s %s from the dependency array.\n%s"
+        (if List.length missing = 1 then "dependency" else "dependencies")
         missing_str
         (suppress_exhaustive_deps_hint ~is_reason)
     in
@@ -510,8 +515,8 @@ let check_outer_scope_deps ~is_reason ~deps_loc ~name
     let msg =
       Printf.sprintf
         "exhaustive-deps: %s has %s: %s. Outer scope values like %s aren't \
-         valid dependencies because mutating them doesn't re-render the \
-         component.\n\
+         valid dependencies because they are constant and never change between \
+         renders.\n\
          %s"
         name
         (if List.length all_outer_scope = 1 then "an unnecessary dependency"
@@ -558,6 +563,12 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
               (body_idents.used_idents |> List.map Longident.name)
               body_idents.bound_names
           in
+          let qualified_body_idents =
+            body_idents.used_idents
+            |> List.filter_map (fun lid ->
+                match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
+            |> StringSet.of_list
+          in
           let dependencies_idents =
             deps_arg
             |> Option.map (fun (_, deps) -> get_idents deps)
@@ -575,8 +586,8 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           check_duplicate_deps ~is_reason ~deps_loc dependencies_names
           @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc
               ~expr_loc:e.pexp_loc ~deps_arg ~callback_arg:(List.nth_opt args 0)
-              ~static_deps ~component_scope_bindings ~dependencies_names
-              ~body_idents_inside_scope
+              ~static_deps ~component_scope_bindings ~qualified_body_idents
+              ~dependencies_names ~body_idents_inside_scope
           @ check_outer_scope_deps ~is_reason ~deps_loc ~name
               ~outer_scope_bindings ~dependencies_names ~dependencies_idents
   | _ -> []
@@ -594,6 +605,7 @@ let is_a_hook_name name =
     && name.[2] = 'e'
     && ((name.[3] >= 'A' && name.[3] <= 'Z')
        || name.[3] = '_'
+       || name.[3] = '\''
        || (name.[3] >= '0' && name.[3] <= '9'))
 
 let is_a_hook longident =
@@ -1013,8 +1025,8 @@ let conditional_hooks_linter (ctx : Expansion_context.Base.t)
       |> List.map (fun loc ->
           make_error_stri ~loc
             "Hooks can't be called conditionally and must be called at the top \
-             level of your component. Move this hook call outside of \
-             conditionals, loops, or nested functions.")
+             level of your component or custom hook. Move this hook call \
+             outside of conditionals, loops, or nested functions.")
     in
     error_items @ structure
 

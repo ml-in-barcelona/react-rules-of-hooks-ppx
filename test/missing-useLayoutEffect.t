@@ -12,7 +12,7 @@
 useLayoutEffect should check exhaustive deps like useEffect
   $ ../src/standalone.exe input.ml
   [@@@ocaml.ppwarning
-    "exhaustive-deps: Missing 'randomProp' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing dependency 'randomProp' from the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   let make ~randomProp  =
     let (show, _setShow) = React.useState (fun () -> false) in
     React.useLayoutEffect1 (fun () -> Js.log randomProp; None) [|show|]; div

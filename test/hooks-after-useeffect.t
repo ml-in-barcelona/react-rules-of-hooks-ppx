@@ -21,7 +21,7 @@
 Multiple hooks in sequence at top level should all be valid (no conditional error)
   $ ../src/standalone.exe input.ml 2>&1
   [@@@ocaml.ppwarning
-    "exhaustive-deps: Missing 'state' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing dependency 'state' from the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   let make ~value  =
     React.useEffect1 (fun () -> Js.log "effect 1"; None) [||];
     React.useEffect2 (fun () -> Js.log "effect 2"; None) (value, ());

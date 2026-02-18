@@ -9,7 +9,7 @@
 useMemo should check exhaustive deps
   $ ../src/standalone.exe input.ml
   [@@@ocaml.ppwarning
-    "exhaustive-deps: Missing 'value' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing dependency 'value' from the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   let make ~value  =
     let _memoized = React.useMemo1 (fun () -> value + 1) [||] in div[@@react.component
                                                                       ]

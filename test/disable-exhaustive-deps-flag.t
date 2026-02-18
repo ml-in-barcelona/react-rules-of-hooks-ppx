@@ -15,7 +15,7 @@ Without the flag, the exhaustive deps warning should appear:
 
   $ ../src/standalone.exe input.ml
   [@@@ocaml.ppwarning
-    "exhaustive-deps: Missing 'randomProp' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing dependency 'randomProp' from the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   let make ~randomProp:(_ : string)  =
     let (show, _setShow) = React.useState (fun () -> "sTatE") in
     React.useEffect1 (fun () -> Js.log randomProp; None) [|show|]; div[@@react.component

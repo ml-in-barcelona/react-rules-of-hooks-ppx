@@ -14,7 +14,7 @@
 Hook in Option.None branch (similar to JS nullish coalescing) should error
   $ ../src/standalone.exe input.ml 2>&1 || true
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~maybeValue  =
     let _ =
       match maybeValue with
@@ -56,7 +56,7 @@ This might not be caught since Option.value eagerly evaluates default in OCaml
 Hook call in pattern match branch should error
   $ ../src/standalone.exe input.ml 2>&1 || true
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~maybeCallback  =
     let _ =
       match maybeCallback with

@@ -115,6 +115,18 @@ Custom hooks with numeric suffixes (use0, use1, use10, etc.)
   let use1 fetch deps = use ~useMemo:React.useMemo1 fetch deps
   let use10 fetch deps = use ~useMemo:React.useMemo10 fetch deps
 
+Custom hook with prime suffix (use')
+  $ cat > input.ml << 'EOF'
+  > let use' ~key ~initialValue () =
+  >   let (value, setValue) = React.useState (fun () -> initialValue) in
+  >   (value, setValue)
+  > EOF
+
+  $ ../src/standalone.exe input.ml 2>&1
+  let use' ~key  ~initialValue  () =
+    let (value, setValue) = React.useState (fun () -> initialValue) in
+    (value, setValue)
+
 Custom hooks with numeric suffixes can call other hooks
   $ cat > input.ml << 'EOF'
   > let use10 fetch dependencies =
