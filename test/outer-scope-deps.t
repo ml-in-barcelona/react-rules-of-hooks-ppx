@@ -16,6 +16,27 @@ Module-level values used in effect body without being in deps should not warn
   let make () = React.useEffect (fun () -> Js.log globalValue; None); div
     [@@react.component ]
 
+Stdlib functions (not, ignore) used in effect body should not warn as missing deps
+  $ cat > input.mlx << 'EOF'
+  > let[@react.component] make ~skip ~fetcher ~memoDeps =
+  >   React.useEffect2
+  >     (fun () ->
+  >       if not skip then fetcher () |> ignore;
+  >       None)
+  >     (memoDeps, skip);
+  >   div
+  > EOF
+
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe input.ml 2>&1
+  [@@@ocaml.ppwarning
+    "exhaustive-deps: Missing 'fetcher' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+  let make ~skip  ~fetcher  ~memoDeps  =
+    React.useEffect2 (fun () -> if not skip then (fetcher ()) |> ignore; None)
+      (memoDeps, skip);
+    div[@@react.component ]
+
 Module-level functions used in effect body without being in deps should not warn
   $ cat > input.mlx << 'EOF'
   > let helper x = x + 1

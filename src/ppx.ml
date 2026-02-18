@@ -109,6 +109,15 @@ let rec extract_function_params (expr : Parsetree.expression) : string list =
   | Pexp_newtype (_, e) -> extract_function_params e
   | _ -> []
 
+let rec extract_label_names (expr : Parsetree.expression) : string list =
+  match expr.pexp_desc with
+  | Pexp_fun (Labelled name, _, _, body) | Pexp_fun (Optional name, _, _, body)
+    ->
+      name :: extract_label_names body
+  | Pexp_fun (Nolabel, _, _, body) -> extract_label_names body
+  | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> extract_label_names e
+  | _ -> []
+
 let get_idents (expression : Parsetree.expression) =
   let is_operator name =
     String.length name > 0
@@ -454,14 +463,13 @@ let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
 
 let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
     ~callback_arg ~(static_deps : StringSet.t)
-    ~(outer_scope_bindings : StringSet.t) ~dependencies_names
+    ~(component_scope_bindings : StringSet.t) ~dependencies_names
     ~body_idents_inside_scope =
   let missing =
     diff body_idents_inside_scope dependencies_names
     |> List.filter (fun dep ->
-        not
-          (StringSet.mem dep static_deps
-          || StringSet.mem dep outer_scope_bindings))
+        StringSet.mem dep component_scope_bindings
+        && not (StringSet.mem dep static_deps))
     |> unique_strings
   in
   if missing = [] then []
@@ -516,7 +524,8 @@ let check_outer_scope_deps ~is_reason ~deps_loc ~name
 
 let check_hook_deps (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
-    (e : Parsetree.expression) : Driver.Lint_error.t list =
+    ~(component_scope_bindings : StringSet.t) (e : Parsetree.expression) :
+    Driver.Lint_error.t list =
   match e.pexp_desc with
   | Pexp_apply
       ( ({ pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ } as
@@ -566,7 +575,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
           check_duplicate_deps ~is_reason ~deps_loc dependencies_names
           @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc
               ~expr_loc:e.pexp_loc ~deps_arg ~callback_arg:(List.nth_opt args 0)
-              ~static_deps ~outer_scope_bindings ~dependencies_names
+              ~static_deps ~component_scope_bindings ~dependencies_names
               ~body_idents_inside_scope
           @ check_outer_scope_deps ~is_reason ~deps_loc ~name
               ~outer_scope_bindings ~dependencies_names ~dependencies_idents
@@ -625,6 +634,7 @@ type analysis_state = {
   context : hook_context;
   static_deps : StringSet.t;
   outer_scope_bindings : StringSet.t;
+  component_scope_bindings : StringSet.t;
   lint_errors_rev : Driver.Lint_error.t list;
   conditional_locations_rev : Location.t list;
   outside_locations_rev : Location.t list;
@@ -666,6 +676,7 @@ let initial_state =
       };
     static_deps = StringSet.empty;
     outer_scope_bindings = StringSet.empty;
+    component_scope_bindings = StringSet.empty;
     lint_errors_rev = [];
     conditional_locations_rev = [];
     outside_locations_rev = [];
@@ -697,18 +708,40 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
             }
           else state
         in
+        let is_inside_scope =
+          state.context.is_inside_component
+          || state.context.is_inside_custom_hook
+        in
+        let state_with_component_scope =
+          if is_inside_scope && (kind = Value || kind = Function) then
+            {
+              state_with_outer_scope with
+              component_scope_bindings =
+                StringSet.union state_with_outer_scope.component_scope_bindings
+                  (StringSet.of_list binding_names);
+            }
+          else state_with_outer_scope
+        in
         let new_static_deps = extract_static_deps_from_binding t in
         let state_with_static_deps =
           if new_static_deps <> [] then
             {
-              state_with_outer_scope with
+              state_with_component_scope with
               static_deps =
-                StringSet.union state_with_outer_scope.static_deps
+                StringSet.union state_with_component_scope.static_deps
                   (StringSet.of_list new_static_deps);
             }
-          else state_with_outer_scope
+          else state_with_component_scope
         in
         let saved_static_deps = state_with_static_deps.static_deps in
+        let saved_component_scope =
+          state_with_static_deps.component_scope_bindings
+        in
+        let function_params =
+          let pattern_names = extract_function_params t.pvb_expr in
+          let label_names = extract_label_names t.pvb_expr in
+          StringSet.of_list (pattern_names @ label_names)
+        in
         let state_for_binding =
           match kind with
           | Component ->
@@ -721,6 +754,7 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                     is_inside_custom_hook = false;
                   };
                 static_deps = StringSet.empty;
+                component_scope_bindings = function_params;
               }
           | Custom_hook ->
               {
@@ -732,6 +766,7 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                     is_inside_custom_hook = true;
                   };
                 static_deps = StringSet.empty;
+                component_scope_bindings = function_params;
               }
           | Function ->
               {
@@ -751,9 +786,14 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
           if enters_new_scope then saved_static_deps
           else state_after_traversal.static_deps
         in
+        let component_scope_bindings =
+          if enters_new_scope then saved_component_scope
+          else state_after_traversal.component_scope_bindings
+        in
         {
           state with
           static_deps;
+          component_scope_bindings;
           outer_scope_bindings = state_after_traversal.outer_scope_bindings;
           lint_errors_rev = state_after_traversal.lint_errors_rev;
           conditional_locations_rev =
@@ -766,7 +806,8 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       else
         match
           check_hook_deps ctx ~static_deps:state.static_deps
-            ~outer_scope_bindings:state.outer_scope_bindings expr
+            ~outer_scope_bindings:state.outer_scope_bindings
+            ~component_scope_bindings:state.component_scope_bindings expr
         with
         | [] -> state
         | errors ->
