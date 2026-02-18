@@ -11,9 +11,9 @@
 
   $ ../src/standalone.exe input.ml
   [@@@ocaml.ppwarning
-    "exhaustive-deps: Missing 'value' in the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
+    "exhaustive-deps: Missing dependency 'value' from the dependency array.\nTo suppress this warning, add [@disable_exhaustive_deps] to the expression"]
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~value =
     let _memoized =
       React.useMemo1

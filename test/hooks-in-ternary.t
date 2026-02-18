@@ -9,7 +9,7 @@
 Hooks in ternary/if-else expression should error (conditional call)
   $ ../src/standalone.exe input.ml 2>&1 || true
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~condition =
     let _ =
       if condition then React.useState (fun () -> 0) else (0, ((fun _ -> ()))) in
@@ -26,7 +26,7 @@ Hooks in ternary/if-else expression should error (conditional call)
 Simple ternary with hook call
   $ ../src/standalone.exe input.ml 2>&1 || true
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~condition =
     let _ = if condition then useTernaryHook () else () in div[@@react.component
                                                                 ]

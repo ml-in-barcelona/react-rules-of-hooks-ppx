@@ -12,7 +12,7 @@
 
   $ ../src/standalone.exe input.ml
   [%%ocaml.error
-    "Hooks can't be called conditionally and must be called at the top level of your component. Move this hook call outside of conditionals, loops, or nested functions."]
+    "Hooks can't be called conditionally and must be called at the top level of your component or custom hook. Move this hook call outside of conditionals, loops, or nested functions."]
   let make ~condition =
     let i = ref 0 in
     while (!i) < 10 do
