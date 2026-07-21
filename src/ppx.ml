@@ -101,6 +101,43 @@ let extract_param_names (params : Parsetree.function_param list) : string list =
       | Pparam_newtype _ -> [])
     params
 
+let extract_platform_match (expr : Parsetree.expression) :
+    (Parsetree.expression * Parsetree.case list) option =
+  match expr.pexp_desc with
+  | Pexp_extension
+      ( { txt = "platform"; _ },
+        PStr
+          [
+            {
+              pstr_desc =
+                Pstr_eval ({ pexp_desc = Pexp_match (scrut, cases); _ }, _);
+              _;
+            };
+          ] ) ->
+      Some (scrut, cases)
+  | _ -> None
+
+let extract_browser_only_payload (expr : Parsetree.expression) :
+    Parsetree.expression option =
+  match expr.pexp_desc with
+  | Pexp_extension
+      ( { txt = "browser_only"; _ },
+        PStr [ { pstr_desc = Pstr_eval (payload, _); _ } ] ) ->
+      Some payload
+  | _ -> None
+
+let rec is_client_pattern (pat : Parsetree.pattern) =
+  match pat.ppat_desc with
+  | Ppat_construct ({ txt = Lident "Client" | Ldot (_, "Client"); _ }, None) ->
+      true
+  | Ppat_constraint (p, _) | Ppat_alias (p, _) | Ppat_open (_, p) ->
+      is_client_pattern p
+  | _ -> false
+
+let find_platform_client_case (cases : Parsetree.case list) :
+    Parsetree.case option =
+  List.find_opt (fun case -> is_client_pattern case.pc_lhs) cases
+
 let rec extract_function_params (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
   | Pexp_function (params, _, Pfunction_body body) ->
@@ -112,7 +149,13 @@ let rec extract_function_params (expr : Parsetree.expression) : string list =
       extract_param_names params @ case_params
   | Pexp_constraint (e, _) -> extract_function_params e
   | Pexp_newtype (_, e) -> extract_function_params e
-  | _ -> []
+  | _ -> (
+      match extract_platform_match expr with
+      | Some (_, cases) ->
+          List.concat_map
+            (fun (case : Parsetree.case) -> extract_function_params case.pc_rhs)
+            cases
+      | None -> [])
 
 let rec extract_label_names (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
@@ -126,7 +169,13 @@ let rec extract_label_names (expr : Parsetree.expression) : string list =
           | _ -> None)
         params
   | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> extract_label_names e
-  | _ -> []
+  | _ -> (
+      match extract_platform_match expr with
+      | Some (_, cases) ->
+          List.concat_map
+            (fun (case : Parsetree.case) -> extract_label_names case.pc_rhs)
+            cases
+      | None -> [])
 
 let get_idents (expression : Parsetree.expression) =
   let is_operator name =
@@ -297,6 +346,20 @@ let get_idents (expression : Parsetree.expression) =
         in
         let values_rev = add_values values_rev binding_names in
         collect body (ids_rev, values_rev)
+    | Pexp_extension _ -> (
+        match extract_browser_only_payload expression with
+        | Some payload -> collect payload (ids_rev, values_rev)
+        | None -> (
+            match extract_platform_match expression with
+            | Some (_, cases) -> (
+                match find_platform_client_case cases with
+                | Some case ->
+                    let values_rev =
+                      add_values values_rev (extract_pattern_names case.pc_lhs)
+                    in
+                    collect case.pc_rhs (ids_rev, values_rev)
+                | None -> (ids_rev, values_rev))
+            | None -> (ids_rev, values_rev)))
     | _ -> (ids_rev, values_rev)
   in
   let ids_rev, values_rev = collect expression ([], []) in
@@ -308,7 +371,10 @@ let rec get_function_body (expr : Parsetree.expression) :
   | Pexp_function (_, _, Pfunction_body body) -> Some body
   | Pexp_function (_, _, Pfunction_cases _) -> Some expr
   | Pexp_constraint (e, _) -> get_function_body e
-  | _ -> None
+  | _ -> (
+      match extract_browser_only_payload expr with
+      | Some payload -> get_function_body payload
+      | None -> None)
 
 let hooks_with_deps =
   let variants = [ ""; "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
@@ -367,7 +433,14 @@ let get_second_tuple_element_names (pattern : Parsetree.pattern) : string list =
 (* Extract static deps from a value binding if it's a useState/useReducer/useRef call *)
 let extract_static_deps_from_binding (vb : Parsetree.value_binding) :
     string list =
-  let expr = vb.pvb_expr in
+  let expr =
+    match extract_platform_match vb.pvb_expr with
+    | Some (_, cases) -> (
+        match find_platform_client_case cases with
+        | Some case -> case.pc_rhs
+        | None -> vb.pvb_expr)
+    | None -> vb.pvb_expr
+  in
   let pattern = vb.pvb_pat in
   if is_use_state_call expr || is_use_reducer_call expr then
     (* Second element of tuple (setter/dispatch) is stable *)
@@ -640,24 +713,49 @@ let is_a_hook longident =
 let contains_jsx (attrs : attributes) =
   attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = "JSX")
 
-let has_any_hooks (structure : Parsetree.structure) : bool =
-  let exception Found in
-  let scanner =
-    object
-      inherit Ast_traverse.iter as super
+exception Hook_found
 
-      method! expression e =
-        match e.pexp_desc with
-        | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _)
-          when is_a_hook lident && not (contains_jsx e.pexp_attributes) ->
-            raise Found
-        | _ -> super#expression e
-    end
-  in
+let hook_scanner =
+  object
+    inherit Ast_traverse.iter as super
+
+    method! expression e =
+      match e.pexp_desc with
+      | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _)
+        when is_a_hook lident && not (contains_jsx e.pexp_attributes) ->
+          raise Hook_found
+      | _ -> super#expression e
+  end
+
+let has_any_hooks (structure : Parsetree.structure) : bool =
   try
-    scanner#structure structure;
+    hook_scanner#structure structure;
     false
-  with Found -> true
+  with Hook_found -> true
+
+let expression_has_hook_calls (expr : Parsetree.expression) : bool =
+  try
+    hook_scanner#expression expr;
+    false
+  with Hook_found -> true
+
+let is_browser_only_hook_wrapper (vb : Parsetree.value_binding) : bool =
+  match get_function_body vb.pvb_expr with
+  | Some _ -> expression_has_hook_calls vb.pvb_expr
+  | None -> (
+      match vb.pvb_expr.pexp_desc with
+      | Pexp_ident { txt; _ } -> is_a_hook txt
+      | _ -> false)
+
+let browser_only_hook_names (vbs : Parsetree.value_binding list) : string list =
+  vbs
+  |> List.filter is_browser_only_hook_wrapper
+  |> List.concat_map (fun (vb : Parsetree.value_binding) ->
+      extract_pattern_names vb.pvb_pat)
+
+let is_tracked_browser_only_hook (lident : Longident.t) (tracked : StringSet.t)
+    : bool =
+  match lident with Lident name -> StringSet.mem name tracked | _ -> false
 
 type hook_context = {
   is_inside_component : bool;
@@ -671,6 +769,7 @@ type analysis_state = {
   static_deps : StringSet.t;
   outer_scope_bindings : StringSet.t;
   component_scope_bindings : StringSet.t;
+  browser_only_hooks : StringSet.t;
   lint_errors_rev : Driver.Lint_error.t list;
   conditional_locations_rev : Location.t list;
   outside_locations_rev : Location.t list;
@@ -685,7 +784,15 @@ type analysis = {
 type binding_kind = Component | Custom_hook | Function | Value
 
 let classify_binding (t : Parsetree.value_binding) =
-  let is_function = Option.is_some (get_function_body t.pvb_expr) in
+  let is_function =
+    match extract_platform_match t.pvb_expr with
+    | Some (_, cases) ->
+        List.exists
+          (fun (case : Parsetree.case) ->
+            Option.is_some (get_function_body case.pc_rhs))
+          cases
+    | None -> Option.is_some (get_function_body t.pvb_expr)
+  in
   if not is_function then Value
   else
     let names = extract_pattern_names t.pvb_pat in
@@ -713,6 +820,7 @@ let initial_state =
     static_deps = StringSet.empty;
     outer_scope_bindings = StringSet.empty;
     component_scope_bindings = StringSet.empty;
+    browser_only_hooks = StringSet.empty;
     lint_errors_rev = [];
     conditional_locations_rev = [];
     outside_locations_rev = [];
@@ -725,117 +833,155 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
 
     method! value_binding t state =
       if not check_order_of_hooks then super#value_binding t state
-      else
-        let kind = classify_binding t in
-        let binding_names = extract_pattern_names t.pvb_pat in
-        let is_outside_component = not state.context.is_inside_component in
-        let is_outside_custom_hook = not state.context.is_inside_custom_hook in
-        let is_outer_scope =
-          is_outside_component && is_outside_custom_hook
-          && (kind = Value || kind = Function)
-        in
-        let state_with_outer_scope =
-          if is_outer_scope then
+      else self#binding_with_kind (classify_binding t) t state
+
+    method private browser_only_binding vb state =
+      if
+        check_order_of_hooks
+        && is_browser_only_hook_wrapper vb
+        && Option.is_some (get_function_body vb.pvb_expr)
+      then self#binding_with_kind Custom_hook vb state
+      else self#value_binding vb state
+
+    method private binding_with_kind kind t state =
+      let binding_names = extract_pattern_names t.pvb_pat in
+      let state =
+        if StringSet.is_empty state.browser_only_hooks then state
+        else
+          {
+            state with
+            browser_only_hooks =
+              StringSet.diff state.browser_only_hooks
+                (StringSet.of_list binding_names);
+          }
+      in
+      let is_outside_component = not state.context.is_inside_component in
+      let is_outside_custom_hook = not state.context.is_inside_custom_hook in
+      let is_outer_scope =
+        is_outside_component && is_outside_custom_hook
+        && (kind = Value || kind = Function)
+      in
+      let state_with_outer_scope =
+        if is_outer_scope then
+          {
+            state with
+            outer_scope_bindings =
+              StringSet.union state.outer_scope_bindings
+                (StringSet.of_list binding_names);
+          }
+        else state
+      in
+      let is_inside_scope =
+        state.context.is_inside_component || state.context.is_inside_custom_hook
+      in
+      let state_with_component_scope =
+        if is_inside_scope && (kind = Value || kind = Function) then
+          {
+            state_with_outer_scope with
+            component_scope_bindings =
+              StringSet.union state_with_outer_scope.component_scope_bindings
+                (StringSet.of_list binding_names);
+          }
+        else state_with_outer_scope
+      in
+      let new_static_deps = extract_static_deps_from_binding t in
+      let state_with_static_deps =
+        if new_static_deps <> [] then
+          {
+            state_with_component_scope with
+            static_deps =
+              StringSet.union state_with_component_scope.static_deps
+                (StringSet.of_list new_static_deps);
+          }
+        else state_with_component_scope
+      in
+      let saved_static_deps = state_with_static_deps.static_deps in
+      let saved_component_scope =
+        state_with_static_deps.component_scope_bindings
+      in
+      let function_params =
+        let pattern_names = extract_function_params t.pvb_expr in
+        let label_names = extract_label_names t.pvb_expr in
+        StringSet.of_list (pattern_names @ label_names)
+      in
+      let state_for_binding =
+        match kind with
+        | Component ->
             {
-              state with
-              outer_scope_bindings =
-                StringSet.union state.outer_scope_bindings
-                  (StringSet.of_list binding_names);
+              state_with_static_deps with
+              context =
+                {
+                  state_with_static_deps.context with
+                  is_inside_component = true;
+                  is_inside_custom_hook = false;
+                };
+              static_deps = StringSet.empty;
+              component_scope_bindings = function_params;
             }
-          else state
-        in
-        let is_inside_scope =
-          state.context.is_inside_component
-          || state.context.is_inside_custom_hook
-        in
-        let state_with_component_scope =
-          if is_inside_scope && (kind = Value || kind = Function) then
+        | Custom_hook ->
             {
-              state_with_outer_scope with
-              component_scope_bindings =
-                StringSet.union state_with_outer_scope.component_scope_bindings
-                  (StringSet.of_list binding_names);
+              state_with_static_deps with
+              context =
+                {
+                  state_with_static_deps.context with
+                  is_inside_component = false;
+                  is_inside_custom_hook = true;
+                };
+              static_deps = StringSet.empty;
+              component_scope_bindings = function_params;
             }
-          else state_with_outer_scope
-        in
-        let new_static_deps = extract_static_deps_from_binding t in
-        let state_with_static_deps =
-          if new_static_deps <> [] then
+        | Function ->
             {
-              state_with_component_scope with
-              static_deps =
-                StringSet.union state_with_component_scope.static_deps
-                  (StringSet.of_list new_static_deps);
+              state_with_static_deps with
+              context =
+                {
+                  state_with_static_deps.context with
+                  is_inside_component = false;
+                  is_inside_custom_hook = false;
+                };
             }
-          else state_with_component_scope
-        in
-        let saved_static_deps = state_with_static_deps.static_deps in
-        let saved_component_scope =
-          state_with_static_deps.component_scope_bindings
-        in
-        let function_params =
-          let pattern_names = extract_function_params t.pvb_expr in
-          let label_names = extract_label_names t.pvb_expr in
-          StringSet.of_list (pattern_names @ label_names)
-        in
-        let state_for_binding =
-          match kind with
-          | Component ->
-              {
-                state_with_static_deps with
-                context =
-                  {
-                    state_with_static_deps.context with
-                    is_inside_component = true;
-                    is_inside_custom_hook = false;
-                  };
-                static_deps = StringSet.empty;
-                component_scope_bindings = function_params;
-              }
-          | Custom_hook ->
-              {
-                state_with_static_deps with
-                context =
-                  {
-                    state_with_static_deps.context with
-                    is_inside_component = false;
-                    is_inside_custom_hook = true;
-                  };
-                static_deps = StringSet.empty;
-                component_scope_bindings = function_params;
-              }
-          | Function ->
-              {
-                state_with_static_deps with
-                context =
-                  {
-                    state_with_static_deps.context with
-                    is_inside_component = false;
-                    is_inside_custom_hook = false;
-                  };
-              }
-          | Value -> state_with_static_deps
-        in
-        let state_after_traversal = super#value_binding t state_for_binding in
-        let enters_new_scope = kind = Component || kind = Custom_hook in
-        let static_deps =
-          if enters_new_scope then saved_static_deps
-          else state_after_traversal.static_deps
-        in
-        let component_scope_bindings =
-          if enters_new_scope then saved_component_scope
-          else state_after_traversal.component_scope_bindings
-        in
-        {
-          state with
-          static_deps;
-          component_scope_bindings;
-          outer_scope_bindings = state_after_traversal.outer_scope_bindings;
-          lint_errors_rev = state_after_traversal.lint_errors_rev;
-          conditional_locations_rev =
-            state_after_traversal.conditional_locations_rev;
-          outside_locations_rev = state_after_traversal.outside_locations_rev;
-        }
+        | Value -> state_with_static_deps
+      in
+      let state_after_traversal = super#value_binding t state_for_binding in
+      let enters_new_scope = kind = Component || kind = Custom_hook in
+      let static_deps =
+        if enters_new_scope then saved_static_deps
+        else state_after_traversal.static_deps
+      in
+      let component_scope_bindings =
+        if enters_new_scope then saved_component_scope
+        else state_after_traversal.component_scope_bindings
+      in
+      {
+        state with
+        static_deps;
+        component_scope_bindings;
+        outer_scope_bindings = state_after_traversal.outer_scope_bindings;
+        browser_only_hooks = state_after_traversal.browser_only_hooks;
+        lint_errors_rev = state_after_traversal.lint_errors_rev;
+        conditional_locations_rev =
+          state_after_traversal.conditional_locations_rev;
+        outside_locations_rev = state_after_traversal.outside_locations_rev;
+      }
+
+    method! structure_item t state =
+      match t.pstr_desc with
+      | Pstr_extension
+          ( ( { txt = "browser_only"; _ },
+              PStr [ { pstr_desc = Pstr_value (_, vbs); _ } ] ),
+            _ ) ->
+          let state =
+            List.fold_left
+              (fun state vb -> self#browser_only_binding vb state)
+              state vbs
+          in
+          {
+            state with
+            browser_only_hooks =
+              StringSet.union state.browser_only_hooks
+                (StringSet.of_list (browser_only_hook_names vbs));
+          }
+      | _ -> super#structure_item t state
 
     method private collect_exhaustive_deps_errors expr state =
       if not check_exhaustive then state
@@ -858,7 +1004,9 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       else
         match expr.pexp_desc with
         | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, _args)
-          when is_a_hook lident && not (contains_jsx expr.pexp_attributes) ->
+          when (is_a_hook lident
+               || is_tracked_browser_only_hook lident state.browser_only_hooks)
+               && not (contains_jsx expr.pexp_attributes) ->
             if has_attribute "disable_order_of_hooks" expr.pexp_attributes then
               state
             else
@@ -908,6 +1056,50 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       in
       let state =
         match t.pexp_desc with
+        | Pexp_extension
+            ( { txt = "platform"; _ },
+              PStr
+                [
+                  {
+                    pstr_desc =
+                      Pstr_eval ({ pexp_desc = Pexp_match (scrut, cases); _ }, _);
+                    _;
+                  };
+                ] ) ->
+            let state = self#expression scrut state in
+            let state =
+              List.fold_left
+                (fun state case -> self#expression case.pc_rhs state)
+                state cases
+            in
+            restore_context hook_context state
+        | Pexp_extension
+            ( { txt = "browser_only"; _ },
+              PStr [ { pstr_desc = Pstr_eval (payload, _); _ } ] ) -> (
+            match payload.pexp_desc with
+            | Pexp_let (_, vbs, body) ->
+                let saved_browser_only = state.browser_only_hooks in
+                let state =
+                  List.fold_left
+                    (fun state vb -> self#browser_only_binding vb state)
+                    state vbs
+                in
+                let state =
+                  {
+                    state with
+                    browser_only_hooks =
+                      StringSet.union state.browser_only_hooks
+                        (StringSet.of_list (browser_only_hook_names vbs));
+                  }
+                in
+                let state = self#expression body state in
+                let state =
+                  { state with browser_only_hooks = saved_browser_only }
+                in
+                restore_context hook_context state
+            | _ ->
+                let state = self#expression payload state in
+                restore_context hook_context state)
         | Pexp_match (expr, cases) ->
             let state = self#expression expr state in
             let state =

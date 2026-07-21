@@ -1,5 +1,29 @@
 # Changes
 
+## 1.3.0
+
+- [FEAT] Understand server-reason-react platform branches: hooks inside
+  `switch%platform` / `match%platform` branches are no longer flagged as
+  conditional (branches are resolved at compile time, one per build target).
+  Runtime conditionals nested inside a branch, or wrapping the switch, still
+  error.
+- [FEAT] `let x = switch%platform ...` bindings whose branches are functions
+  classify as components/custom hooks/functions by the usual name and
+  attribute rules (per-target hook implementations, e.g.
+  `let use = switch%platform () { | Server => Context.use | Client => ReasonReactRouter.useUrl }`).
+- [FEAT] `let%browser_only`-bound functions whose bodies call hooks are
+  treated as custom hooks regardless of name, and their call sites are
+  linted like hook calls (conditional call = error, with
+  `[@disable_order_of_hooks]` as the opt-out). Hook-free `%browser_only`
+  utilities are unaffected and may still be called conditionally.
+- [FEAT] Exhaustive-deps sees through `[%browser_only ...]` payloads. Note:
+  this can surface new missing-deps lint warnings in code that was
+  previously invisible to deps analysis.
+- [FEAT] Exhaustive-deps considers only the `Client` branch of
+  `switch%platform` (dependency arrays only drive behavior in the client
+  bundle); `useState`/`useReducer`/`useRef` results bound through a
+  `Client` branch register as stable deps.
+
 ## 1.2.0
 
 - [FEAT] Support `use` + numbers as a valid hook name

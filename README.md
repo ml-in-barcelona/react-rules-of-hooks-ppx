@@ -79,6 +79,41 @@ This will produce the following error:
 Error: Hooks can't be called conditionally and must be called at the top-level of your component. Move this hook call outside of conditionals, loops, or nested functions.
 ```
 
+### Platform branches (server-reason-react)
+
+[server-reason-react](https://github.com/ml-in-barcelona/server-reason-react)'s
+`switch%platform` and `let%browser_only` / `[%browser_only ...]` constructs
+are resolved at compile time, per build target: exactly one branch survives
+in each emitted bundle. The ppx understands this and does **not** treat them
+as runtime conditionals:
+
+```reason
+let use = () => {
+  switch%platform (Runtime.platform) {
+  | Server => Screen.Desktop
+  | Client =>
+    /* Not conditional: this is the whole function body in the JS bundle */
+    let (media, setMedia) = React.useState(() => getMedia());
+    media->Screen.fromMedia;
+  };
+};
+```
+
+- Hooks may be called in `| Server` and `| Client` branches of
+  `switch%platform`. Real runtime conditionals nested *inside* a branch (or
+  wrapping the switch) still error.
+- `let%browser_only`-bound functions whose bodies call hooks are treated as
+  custom hooks regardless of their name, and calls to them are linted like
+  hook calls. Hook-free `%browser_only` utilities are unaffected.
+- Exhaustive-deps analysis inside a `switch%platform` considers the `Client`
+  branch only — dependency arrays only drive behavior in the client bundle.
+- `[@platform native]` / `[@platform js]` item attributes need no special
+  handling and are linted as ordinary code.
+
+`[@disable_order_of_hooks]` remains the escape hatch for genuinely
+conditional hooks, e.g. a runtime `switch` nested inside a `| Client`
+branch.
+
 ## Install
 
 ```bash
