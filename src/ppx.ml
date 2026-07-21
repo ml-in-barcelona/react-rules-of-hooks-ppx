@@ -584,15 +584,110 @@ let check_outer_scope_deps ~is_reason ~deps_loc ~name
     in
     [ Driver.Lint_error.of_string deps_loc msg ]
 
+let find_direct_setter_call ~(setters : StringSet.t)
+    (body : Parsetree.expression) : string option =
+  let exception Found of string in
+  let scanner =
+    object
+      inherit Ast_traverse.iter as super
+
+      method! expression e =
+        match e.pexp_desc with
+        | Pexp_function _ -> ()
+        | Pexp_apply ({ pexp_desc = Pexp_ident { txt = Lident name; _ }; _ }, _)
+          when StringSet.mem name setters ->
+            raise (Found name)
+        | _ -> super#expression e
+    end
+  in
+  try
+    scanner#expression body;
+    None
+  with Found name -> Some name
+
+let check_no_deps_effect ~(static_deps : StringSet.t) ~name ~loc callback_arg :
+    Driver.Lint_error.t list =
+  let direct_setter =
+    match callback_arg with
+    | Some (_, fn_expr) ->
+        Option.bind
+          (get_function_body fn_expr)
+          (find_direct_setter_call ~setters:static_deps)
+    | None -> None
+  in
+  match direct_setter with
+  | Some setter ->
+      let msg =
+        Printf.sprintf
+          "exhaustive-deps: This effect contains a call to '%s'. Without a \
+           dependency array, this can lead to an infinite chain of updates. \
+           Use %s0 or add a dependency array."
+          setter name
+      in
+      [ Driver.Lint_error.of_string loc msg ]
+  | None -> []
+
+let no_deps_memo_error ~name ~loc : Driver.Lint_error.t list =
+  let msg =
+    Printf.sprintf
+      "exhaustive-deps: %s does nothing when called without a dependency \
+       array. Did you mean %sN with dependencies?"
+      name name
+  in
+  [ Driver.Lint_error.of_string loc msg ]
+
+let check_hook_deps_exhaustiveness (ctx : Expansion_context.Base.t)
+    ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
+    ~(component_scope_bindings : StringSet.t) ~name ~fn_loc ~deps_arg ~args
+    (e : Parsetree.expression) : Driver.Lint_error.t list =
+  let body_idents =
+    (match List.nth_opt args 0 with
+      | Some (_, fn_expr) -> get_function_body fn_expr
+      | _ -> None)
+    |> Option.map get_idents
+    |> Option.value ~default:{ used_idents = []; bound_names = [] }
+  in
+  let body_idents_inside_scope =
+    diff
+      (body_idents.used_idents |> List.map Longident.name)
+      body_idents.bound_names
+  in
+  let qualified_body_idents =
+    body_idents.used_idents
+    |> List.filter_map (fun lid ->
+        match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
+    |> StringSet.of_list
+  in
+  let dependencies_idents =
+    deps_arg
+    |> Option.map (fun (_, deps) -> get_idents deps)
+    |> Option.value ~default:{ used_idents = []; bound_names = [] }
+  in
+  let dependencies_names =
+    dependencies_idents.used_idents |> List.map Longident.name
+  in
+  let deps_loc =
+    match deps_arg with
+    | Some (_, deps_expr) -> deps_expr.pexp_loc
+    | None -> e.pexp_loc
+  in
+  let is_reason = is_reason_file ctx in
+  check_duplicate_deps ~is_reason ~deps_loc dependencies_names
+  @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc:e.pexp_loc
+      ~deps_arg ~callback_arg:(List.nth_opt args 0) ~static_deps
+      ~component_scope_bindings ~qualified_body_idents ~dependencies_names
+      ~body_idents_inside_scope
+  @ check_outer_scope_deps ~is_reason ~deps_loc ~name ~outer_scope_bindings
+      ~dependencies_names ~dependencies_idents
+
 let check_hook_deps (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
     ~(component_scope_bindings : StringSet.t) (e : Parsetree.expression) :
     Driver.Lint_error.t list =
   match e.pexp_desc with
   | Pexp_apply
-      ( ({ pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ } as
-         _fn_expr),
-        args ) ->
+      ( { pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ },
+        args ) -> (
       let name = Longident.name lident in
       if not (is_hook_with_deps name) then []
       else
@@ -608,45 +703,20 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
         in
         if is_disabled then []
         else
-          let body_idents =
-            (match List.nth_opt args 0 with
-              | Some (_, fn_expr) -> get_function_body fn_expr
-              | _ -> None)
-            |> Option.map get_idents
-            |> Option.value ~default:{ used_idents = []; bound_names = [] }
-          in
-          let body_idents_inside_scope =
-            diff
-              (body_idents.used_idents |> List.map Longident.name)
-              body_idents.bound_names
-          in
-          let qualified_body_idents =
-            body_idents.used_idents
-            |> List.filter_map (fun lid ->
-                match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
-            |> StringSet.of_list
-          in
-          let dependencies_idents =
-            deps_arg
-            |> Option.map (fun (_, deps) -> get_idents deps)
-            |> Option.value ~default:{ used_idents = []; bound_names = [] }
-          in
-          let dependencies_names =
-            dependencies_idents.used_idents |> List.map Longident.name
-          in
-          let deps_loc =
-            match deps_arg with
-            | Some (_, deps_expr) -> deps_expr.pexp_loc
-            | None -> e.pexp_loc
-          in
-          let is_reason = is_reason_file ctx in
-          check_duplicate_deps ~is_reason ~deps_loc dependencies_names
-          @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc
-              ~expr_loc:e.pexp_loc ~deps_arg ~callback_arg:(List.nth_opt args 0)
-              ~static_deps ~component_scope_bindings ~qualified_body_idents
-              ~dependencies_names ~body_idents_inside_scope
-          @ check_outer_scope_deps ~is_reason ~deps_loc ~name
-              ~outer_scope_bindings ~dependencies_names ~dependencies_idents
+          match (deps_arg, decode_hook_name name) with
+          | ( None,
+              Some
+                ( _,
+                  ("useEffect" | "useLayoutEffect" | "useInsertionEffect"),
+                  None ) ) ->
+              check_no_deps_effect ~static_deps ~name ~loc:e.pexp_loc
+                (List.nth_opt args 0)
+          | None, Some (_, ("useMemo" | "useCallback"), None) ->
+              no_deps_memo_error ~name ~loc:e.pexp_loc
+          | _ ->
+              check_hook_deps_exhaustiveness ctx ~static_deps
+                ~outer_scope_bindings ~component_scope_bindings ~name ~fn_loc
+                ~deps_arg ~args e)
   | _ -> []
 
 let get_name longident =

@@ -16,9 +16,9 @@
   linted like hook calls (conditional call = error, with
   `[@disable_order_of_hooks]` as the opt-out). Hook-free `%browser_only`
   utilities are unaffected and may still be called conditionally.
-- [FEAT] Exhaustive-deps sees through `[%browser_only ...]` payloads. Note:
-  this can surface new missing-deps lint warnings in code that was
-  previously invisible to deps analysis.
+- [FEAT] Exhaustive-deps sees through `[%browser_only ...]` payloads. This
+  can surface new missing-deps lint warnings in code deps analysis could
+  not see before.
 - [FEAT] Exhaustive-deps considers only the `Client` branch of
   `switch%platform` (dependency arrays only drive behavior in the client
   bundle); `useState`/`useReducer`/`useRef` results bound through a
@@ -33,6 +33,19 @@
   `dispatch...` is treated as stable. Plain closures, whole-return bindings,
   and non-conventional names are still checked. Generated `-corrections`
   never include exempted values.
+- [FIX] Effects without a dependency array (`React.useEffect(fn)`,
+  `useLayoutEffect`, `useInsertionEffect`) no longer report missing
+  dependencies: they run after every render, so nothing can be stale.
+  Matches eslint-plugin-react-hooks. Order-of-hooks checks still apply to
+  these calls and their callbacks.
+- [FEAT] A direct `useState`/`useReducer` setter call inside a no-deps
+  effect warns about an infinite chain of updates (setters inside nested
+  functions are fine).
+- [FEAT] Unsuffixed `useMemo`/`useCallback` warn that the memoization does
+  nothing without a dependency array, instead of demanding deps the call
+  cannot take. This and the setter-loop warning are new diagnostics and can
+  appear at previously silent sites, which matters when bumping under
+  warnings-as-errors.
 
 ## 1.2.0
 

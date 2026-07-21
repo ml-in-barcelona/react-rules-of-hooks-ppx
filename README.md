@@ -55,6 +55,13 @@ With this ppx, it will produce the following warning:
 16 |   ).
 ```
 
+Effects without a dependency array (`React.useEffect(fn)`) run after every
+render and can never observe stale values, so they get no exhaustiveness
+checking, same as eslint-plugin-react-hooks. Two related diagnostics do
+apply: a direct `useState`/`useReducer` setter call in a no-deps effect
+warns about an infinite update chain, and unsuffixed `useMemo`/`useCallback`
+warn that the memoization does nothing.
+
 Values that never change identity across renders are exempt from dependency
 arrays. This covers the React builtins (`useState`/`useReducer` setters,
 `useRef` results) and two automatic extensions, no configuration needed:
@@ -132,7 +139,8 @@ let use = () => {
   custom hooks regardless of their name, and calls to them are linted like
   hook calls. Hook-free `%browser_only` utilities are unaffected.
 - Exhaustive-deps analysis inside a `switch%platform` considers the `Client`
-  branch only — dependency arrays only drive behavior in the client bundle.
+  branch only, since dependency arrays drive behavior in the client bundle
+  alone.
 - `[@platform native]` / `[@platform js]` item attributes need no special
   handling and are linted as ordinary code.
 
