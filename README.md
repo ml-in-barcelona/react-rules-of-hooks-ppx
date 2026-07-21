@@ -55,6 +55,32 @@ With this ppx, it will produce the following warning:
 16 |   ).
 ```
 
+Values that never change identity across renders are exempt from dependency
+arrays. This covers the React builtins (`useState`/`useReducer` setters,
+`useRef` results) and two automatic extensions, no configuration needed:
+
+- **Same-file wrappers.** A `use*` binding whose body is directly an
+  application of a known-stable hook inherits its stability, transitively:
+
+  ```reason
+  let useStateValue = initial => useReducer((_, next) => next, initial);
+  /* setters returned by useStateValue are exempt in this file */
+  ```
+
+- **Setter naming convention.** When destructuring the result of *any* hook
+  call, a second tuple element or record field named `set[A-Z]...`,
+  `set_...`, or `dispatch...` is treated as stable:
+
+  ```reason
+  let (isHydrated, setIsHydrated) = RR.useStateValue(false);
+  /* setIsHydrated is exempt; other deps in the same effect are still checked */
+  ```
+
+  This one is a heuristic: a genuinely unstable function named like a setter
+  in setter position would be missed. Plain closures (`let setLocal = ...`),
+  whole-return bindings (`let setAll = Hook.use()`), and non-conventional
+  names are still checked.
+
 ### Order of hooks
 
 Hooks must be called at the top level of your component. Calling hooks inside conditionals, loops, or nested functions will produce an error that fails the build:

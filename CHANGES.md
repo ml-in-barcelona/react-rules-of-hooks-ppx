@@ -23,6 +23,16 @@
   `switch%platform` (dependency arrays only drive behavior in the client
   bundle); `useState`/`useReducer`/`useRef` results bound through a
   `Client` branch register as stable deps.
+- [FEAT] Automatic stable-hook detection: a same-file `use*` wrapper whose
+  body is directly a `useState`/`useReducer`/`useRef` application inherits
+  its stability (chains resolve transitively), so
+  `let useStateValue = initial => useReducer(...)` setters stop triggering
+  missing-deps warnings at every use site.
+- [FEAT] Setter naming convention: when destructuring any hook call result,
+  a second tuple element or record field named `set[A-Z]...`, `set_...`, or
+  `dispatch...` is treated as stable. Plain closures, whole-return bindings,
+  and non-conventional names are still checked. Generated `-corrections`
+  never include exempted values.
 
 ## 1.2.0
 
