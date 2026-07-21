@@ -2,32 +2,23 @@
 
 A ppx that validates React's [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks) at compile time.
 
-### **Features**
-- Exhaustive dependencies in useEffect, useCallback, useMemo, etc.
-- Order of Hooks validation:
-  - Hooks can't be called conditionally
-  - Hooks must be called at the top level
-  - Hooks can only be called from `[@react.component]` functions or custom hooks
+- Exhaustive dependencies in `useEffect`, `useMemo`, `useCallback`, etc.
+- Order of hooks: no conditional calls, top level only, and only inside
+  `[@react.component]` functions or custom hooks.
 
-## How it works
+## Exhaustive dependencies
 
-### Exhaustive dependencies
-
-Here we have a dummy react component:
-
-```re
+```reason
 [@react.component]
-/* Recives a "randomProp" prop */
 let make = (~randomProp) => {
   let (show, setShow) = React.useState(() => false);
 
-  /* We have a useEffect that re-runs each time the state "show" changes it's value, and we only want to trigger the `setShow` when `randomProp` is true. */
   React.useEffect1(
     () => {
-      /* Since this effect relies on "randomProp" and is not present on the dependency array... it will re-run only when show changes, and not when randomProp changes and may cause undesired behaviour */
+      /* reads randomProp, but only [|show|] is declared */
       if (randomProp) {
         setShow(prevShow => !prevShow);
-      }
+      };
       None;
     },
     [|show|],
@@ -37,60 +28,35 @@ let make = (~randomProp) => {
 };
 ```
 
-With this ppx, it will produce the following warning:
-
 ```bash
- 6 |   React.useEffect1(
- 7 |     () => {
- 8 |       if (randomProp) {
- 9 |         setShow(_ => !show);
-10 |       }
-...
-13 |       None;
-14 |     },
 15 |     [|show|],
          ^^^^^^^^
          Error (warning 22): exhaustive-deps: Missing 'randomProp' in the dependency array.
          To suppress this warning, add [@disable_exhaustive_deps] before the expression
-16 |   ).
 ```
 
 Effects without a dependency array (`React.useEffect(fn)`) run after every
 render and can never observe stale values, so they get no exhaustiveness
-checking, same as eslint-plugin-react-hooks. Two related diagnostics do
-apply: a direct `useState`/`useReducer` setter call in a no-deps effect
-warns about an infinite update chain, and unsuffixed `useMemo`/`useCallback`
-warn that the memoization does nothing.
+checking, same as eslint-plugin-react-hooks. A direct `useState`/`useReducer`
+setter call in such an effect warns about an infinite update chain, and
+unsuffixed `useMemo`/`useCallback` warn that the memoization does nothing.
 
-Values that never change identity across renders are exempt from dependency
-arrays. This covers the React builtins (`useState`/`useReducer` setters,
-`useRef` results) and two automatic extensions, no configuration needed:
+Stable values are exempt from dependency arrays, with no configuration:
 
-- **Same-file wrappers.** A `use*` binding whose body is directly an
-  application of a known-stable hook inherits its stability, transitively:
+- `useState`/`useReducer` setters and `useRef` results.
+- Same-file `use*` wrappers around them, transitively:
+  `let useStateValue = initial => useReducer((_, next) => next, initial);`
+  makes setters returned by `useStateValue` exempt in that file.
+- By naming convention, a second tuple element or record field named
+  `set[A-Z]...`, `set_...`, or `dispatch...` destructured from any hook
+  call. This one is a heuristic; plain closures (`let setLocal = ...`),
+  whole-return bindings (`let setAll = Hook.use()`), and other names are
+  still checked.
 
-  ```reason
-  let useStateValue = initial => useReducer((_, next) => next, initial);
-  /* setters returned by useStateValue are exempt in this file */
-  ```
+## Order of hooks
 
-- **Setter naming convention.** When destructuring the result of *any* hook
-  call, a second tuple element or record field named `set[A-Z]...`,
-  `set_...`, or `dispatch...` is treated as stable:
-
-  ```reason
-  let (isHydrated, setIsHydrated) = RR.useStateValue(false);
-  /* setIsHydrated is exempt; other deps in the same effect are still checked */
-  ```
-
-  This one is a heuristic: a genuinely unstable function named like a setter
-  in setter position would be missed. Plain closures (`let setLocal = ...`),
-  whole-return bindings (`let setAll = Hook.use()`), and non-conventional
-  names are still checked.
-
-### Order of hooks
-
-Hooks must be called at the top level of your component. Calling hooks inside conditionals, loops, or nested functions will produce an error that fails the build:
+Calling hooks inside conditionals, loops, or nested functions fails the
+build:
 
 ```reason
 [@react.component]
@@ -103,50 +69,25 @@ let make = (~condition) => {
 };
 ```
 
-This will produce the following error:
-
 ```bash
-3 |   if (condition) {
 4 |     let (state, _) = React.useState(() => 0);
                          ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Hooks can't be called conditionally and must be called at the top-level of your component. Move this hook call outside of conditionals, loops, or nested functions.
 ```
 
-### Platform branches (server-reason-react)
+## Platform branches (server-reason-react)
 
 [server-reason-react](https://github.com/ml-in-barcelona/server-reason-react)'s
-`switch%platform` and `let%browser_only` / `[%browser_only ...]` constructs
-are resolved at compile time, per build target: exactly one branch survives
-in each emitted bundle. The ppx understands this and does **not** treat them
+`switch%platform` and `let%browser_only` / `[%browser_only ...]` are resolved
+at compile time, one branch per build target, so the ppx does not treat them
 as runtime conditionals:
 
-```reason
-let use = () => {
-  switch%platform (Runtime.platform) {
-  | Server => Screen.Desktop
-  | Client =>
-    /* Not conditional: this is the whole function body in the JS bundle */
-    let (media, setMedia) = React.useState(() => getMedia());
-    media->Screen.fromMedia;
-  };
-};
-```
-
-- Hooks may be called in `| Server` and `| Client` branches of
-  `switch%platform`. Real runtime conditionals nested *inside* a branch (or
-  wrapping the switch) still error.
-- `let%browser_only`-bound functions whose bodies call hooks are treated as
-  custom hooks regardless of their name, and calls to them are linted like
-  hook calls. Hook-free `%browser_only` utilities are unaffected.
-- Exhaustive-deps analysis inside a `switch%platform` considers the `Client`
-  branch only, since dependency arrays drive behavior in the client bundle
-  alone.
-- `[@platform native]` / `[@platform js]` item attributes need no special
-  handling and are linted as ordinary code.
-
-`[@disable_order_of_hooks]` remains the escape hatch for genuinely
-conditional hooks, e.g. a runtime `switch` nested inside a `| Client`
-branch.
+- Hooks may be called in `| Server` and `| Client` branches. Real runtime
+  conditionals nested inside a branch (or wrapping the switch) still error.
+- `let%browser_only` functions that call hooks count as custom hooks
+  whatever their name, and calls to them are linted like hook calls.
+- Exhaustive-deps reads only the `Client` branch, where dependency arrays
+  matter.
 
 ## Install
 
@@ -154,97 +95,51 @@ branch.
 opam install react-rules-of-hooks-ppx
 ```
 
-Add the ppx into the dune files
-
 ```clojure
 (preprocess (pps reason-react react-rules-of-hooks-ppx))
 ```
 
-#### Suppress warnings locally
+## Suppress locally
 
-If you need to suppress an exhaustive deps warning for a specific case (e.g., you intentionally want to omit a dependency), use the `[@disable_exhaustive_deps]` attribute.
+Attach the attribute to the hook call:
 
-**In Reason (.re files):**
 ```reason
 [@disable_exhaustive_deps]
-React.useEffect1(() => {
-  /* ... */
-  None
-}, [|dep|]);
-```
+React.useEffect1(() => {...}, [|dep|]);
 
-**In OCaml (.ml files):**
-```ocaml
-(React.useEffect1 (fun () ->
-  (* ... *)
-  None
-) [|dep|])[@disable_exhaustive_deps]
-```
-
-#### Disable "Exhaustive dependencies in useEffect" on the library
-
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx -disable-exhaustive-deps))
-```
-
-#### Suppress order-of-hooks warnings locally
-
-If you need to suppress an order-of-hooks warning for a specific case (e.g., test utilities, switch%platform or intentional dynamic hook usage), use the `[@disable_order_of_hooks]` attribute.
-
-**In Reason (.re files):**
-```reason
 if (condition) {
   [@disable_order_of_hooks]
   useMyHook();
 };
 ```
 
-**In OCaml (.ml files):**
-```ocaml
-if condition then
-  (useMyHook ())[@disable_order_of_hooks]
-```
+In OCaml syntax the attribute goes after the expression:
+`(useMyHook ())[@disable_order_of_hooks]`.
 
-##### Disable "Order of Hooks" on the library
+`[@disable_order_of_hooks]` remains the escape hatch for genuinely
+conditional hooks.
 
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx -disable-order-of-hooks))
-```
+## Flags
 
-#### Enable automatic corrections for missing dependencies
+Append to the `pps` line:
 
-This ppx can generate `.ppx-corrected` files with suggested fixes for missing dependencies. This integrates with dune's promotion workflow, allowing you to review and accept the suggested changes.
+- `-disable-exhaustive-deps` turns off dependency checking.
+- `-disable-order-of-hooks` turns off order-of-hooks checking.
+- `-corrections` writes `.ppx-corrected` files with suggested fixes for
+  missing dependencies; review and accept them with `dune promote`:
 
-```clojure
-(preprocess (pps reason-react react-rules-of-hooks-ppx -corrections))
-```
-When enabled, running the build will show a diff with the suggested fix:
-
-```reason
-[@react.component]
-let make = (~dep1) => {
-  React.useEffect0(() => {
-    Js.log(dep1);
-    None;
-  });
-  <span />;
-};
-```
-
-```diff
--  React.useEffect0(() => {
-+  React.useEffect1(() => {
-    Js.log(dep1);
-    None;
--  });
-+  }, [| dep1 |]);
-```
-
-You can then run `dune promote` to accept the corrections.
+  ```diff
+  -  React.useEffect0(() => {
+  +  React.useEffect1(() => {
+      Js.log(dep1);
+      None;
+  -  });
+  +  }, [| dep1 |]);
+  ```
 
 ## Issues
 
-Feel free to use it and report any unexpected behaviour in the [bug tracker](https://github.com/ml-in-barcelona/react-rules-of-hooks-ppx/issues)
+Report any unexpected behaviour in the [bug tracker](https://github.com/ml-in-barcelona/react-rules-of-hooks-ppx/issues)
 
 ## Acknowledgements
 
