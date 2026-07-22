@@ -3,7 +3,8 @@
 How react-rules-of-hooks-ppx works: what it checks, how each rule is
 specified, and how the implementation is put together. This document
 consolidates the original design notes for platform branches, stable-hook
-detection, and member-path dependency tracking.
+detection, member-path dependency tracking, and effects without a
+dependency array.
 
 ## Overview
 
@@ -291,14 +292,61 @@ are constant and never change between renders.
 
 ### Effects without a dependency array
 
-`useEffect(fn)` with no array runs after every render, so nothing can be
-stale and exhaustiveness is skipped. Two targeted diagnostics replace it:
+`useEffect(fn)` with no array runs after every render, so it can never
+observe stale values and there is nothing to be exhaustive about.
+eslint-plugin-react-hooks does the same: when the declared-dependencies
+node is absent, `ExhaustiveDeps.ts` returns before any exhaustiveness
+analysis. reason-react even makes the distinction syntactic:
+
+- `React.useEffect(fn)`: no dependency array, runs every render;
+- `React.useEffect0(fn)`: `[||]`, runs once;
+- `React.useEffectN(fn, deps)`: explicit deps.
+
+An unsuffixed effect call *cannot* take a deps array, so a missing-deps
+report on one demands an impossible fix. Before 1.3.0 the ppx analyzed
+these calls as if the declared deps were empty, and the message pushed
+users toward the worst outcome: deleting the effect. Two textbook-correct
+hooks were broken exactly that way in production, including the
+`usePrevious` pattern from the React docs:
+
+```reason
+let use = value => {
+  let valueRef = React.useRef(value);
+
+  React.useEffect(() => {   /* deleted to silence the ppx */
+    valueRef.current = value;
+    None;
+  });
+
+  valueRef.current;          /* without the effect: initial value, forever */
+};
+```
+
+The skip is not blanket. Two targeted diagnostics replace exhaustiveness,
+both ported from eslint:
 
 - A *direct* call to a known-stable setter inside a no-array effect warns
   about an infinite chain of updates (each run schedules a rerender, which
-  reruns the effect). Setter calls inside nested functions are fine.
-- No-array `useMemo`/`useCallback` warn that the memoization does nothing;
-  the value is recomputed every render.
+  reruns the effect):
+
+  ```
+  exhaustive-deps: This effect contains a call to 'setState'. Without a
+  dependency array, this can lead to an infinite chain of updates. Use
+  React.useEffect0 or add a dependency array.
+  ```
+
+  The setter set is the same static-deps machinery used for exemptions, so
+  Layer 1/Layer 2 stable setters trigger it too. A setter called inside a
+  nested function (event handler, promise callback) is fine.
+- No-array `useMemo`/`useCallback` recompute every render, so the
+  memoization does nothing; they warn and suggest the `N`-suffixed variant.
+
+Implementation note: the deps-taking hook table keeps the unsuffixed names.
+Dropping them would also stop the traversal from marking effect callbacks
+as conditional contexts, and a hook called inside `React.useEffect(fn)`
+must stay an order violation. The skip is a dispatch inside the deps check
+(`deps_arg = None` on an unsuffixed effect base), leaving traversal
+untouched; both properties are pinned by `test/no-deps-*.t`.
 
 ### Inside platform branches
 
