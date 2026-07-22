@@ -1,7 +1,7 @@
 (library
  (name react_rules_of_hooks_ppx)
  (public_name react-rules-of-hooks-ppx)
- (modules ppx)
+ (modules ppx platform hook bindings deps stable scope)
  (kind ppx_rewriter)
  (libraries ppxlib unix))
 

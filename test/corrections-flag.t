@@ -83,3 +83,18 @@ With the -corrections flag, the diff should appear with properly formatted deps 
   $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
   -  React.useEffect2 (fun () -> Js.log dep1; Js.log dep2; Js.log dep3; None)
   +  React.useEffect3 (fun () -> Js.log dep1; Js.log dep2; Js.log dep3; None)
+
+Member paths are emitted in corrections: the generated array contains
+input.page, not input
+  $ cat > input.mlx << 'EOF2'
+  > type params = { page : int; limit : int }
+  > let[@react.component] make ~(input : params) =
+  >   React.useEffect1 (fun () -> Js.log input.page; None) [| input.limit |];
+  >   div
+  > EOF2
+
+  $ mlx-pp -print-ml input.mlx > input.ml
+
+  $ ../src/standalone.exe -corrections input.ml 2>&1 | grep -E "^[+-].*useEffect"
+  -  React.useEffect1 (fun () -> Js.log input.page; None) [|(input.limit)|]; div
+  +  React.useEffect2 (fun () -> Js.log input.page; None) (input.limit, input.page); div

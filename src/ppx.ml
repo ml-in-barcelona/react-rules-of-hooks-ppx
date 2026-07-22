@@ -1,6 +1,5 @@
 open Ppxlib
 module StringSet = Set.Make (String)
-module StringMap = Map.Make (String)
 
 module LocationSet = Set.Make (struct
   type t = Location.t
@@ -33,10 +32,6 @@ let make_error_stri ~loc msg =
     (Location.error_extensionf ~loc "%s" msg)
     []
 
-let diff list1 list2 =
-  let list2_set = StringSet.of_list list2 in
-  List.filter (fun item -> not (StringSet.mem item list2_set)) list1
-
 let unique_strings list =
   let _, acc_rev =
     List.fold_left
@@ -67,337 +62,10 @@ let unique_locations list =
   List.rev acc_rev
 
 let quotes = Printf.sprintf "'%s'"
+let quoted_list list = list |> List.map quotes |> String.concat ", "
 
-type ident_info = { used_idents : longident list; bound_names : string list }
-
-let rec extract_pattern_names (pattern : Parsetree.pattern) : string list =
-  match pattern.ppat_desc with
-  | Ppat_var { txt; _ } -> [ txt ]
-  | Ppat_tuple patterns -> List.concat_map extract_pattern_names patterns
-  | Ppat_record (fields, _) ->
-      List.concat_map (fun (_, pat) -> extract_pattern_names pat) fields
-  | Ppat_construct (_, Some (_, pat)) -> extract_pattern_names pat
-  | Ppat_variant (_, Some pat) -> extract_pattern_names pat
-  | Ppat_or (p1, p2) -> extract_pattern_names p1 @ extract_pattern_names p2
-  | Ppat_constraint (pat, _) -> extract_pattern_names pat
-  | Ppat_alias (pat, { txt; _ }) -> txt :: extract_pattern_names pat
-  | Ppat_array patterns -> List.concat_map extract_pattern_names patterns
-  | Ppat_lazy pat -> extract_pattern_names pat
-  | Ppat_open (_, pat) -> extract_pattern_names pat
-  | Ppat_exception pat -> extract_pattern_names pat
-  | Ppat_any -> []
-  | Ppat_constant _ -> []
-  | Ppat_interval _ -> []
-  | Ppat_construct (_, None) -> []
-  | Ppat_variant (_, None) -> []
-  | Ppat_type _ -> []
-  | Ppat_unpack _ -> []
-  | Ppat_extension _ -> []
-
-let extract_param_names (params : Parsetree.function_param list) : string list =
-  List.concat_map
-    (fun (p : Parsetree.function_param) ->
-      match p.pparam_desc with
-      | Pparam_val (_, _, pat) -> extract_pattern_names pat
-      | Pparam_newtype _ -> [])
-    params
-
-let extract_platform_match (expr : Parsetree.expression) :
-    (Parsetree.expression * Parsetree.case list) option =
-  match expr.pexp_desc with
-  | Pexp_extension
-      ( { txt = "platform"; _ },
-        PStr
-          [
-            {
-              pstr_desc =
-                Pstr_eval ({ pexp_desc = Pexp_match (scrut, cases); _ }, _);
-              _;
-            };
-          ] ) ->
-      Some (scrut, cases)
-  | _ -> None
-
-let extract_browser_only_payload (expr : Parsetree.expression) :
-    Parsetree.expression option =
-  match expr.pexp_desc with
-  | Pexp_extension
-      ( { txt = "browser_only"; _ },
-        PStr [ { pstr_desc = Pstr_eval (payload, _); _ } ] ) ->
-      Some payload
-  | _ -> None
-
-let rec is_client_pattern (pat : Parsetree.pattern) =
-  match pat.ppat_desc with
-  | Ppat_construct ({ txt = Lident "Client" | Ldot (_, "Client"); _ }, None) ->
-      true
-  | Ppat_constraint (p, _) | Ppat_alias (p, _) | Ppat_open (_, p) ->
-      is_client_pattern p
-  | _ -> false
-
-let platform_client_case (expr : Parsetree.expression) : Parsetree.case option =
-  match extract_platform_match expr with
-  | Some (_, cases) ->
-      List.find_opt (fun case -> is_client_pattern case.pc_lhs) cases
-  | None -> None
-
-let rec extract_function_params (expr : Parsetree.expression) : string list =
-  match expr.pexp_desc with
-  | Pexp_function (params, _, Pfunction_body body) ->
-      extract_param_names params @ extract_function_params body
-  | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-      let case_params =
-        List.concat_map (fun case -> extract_pattern_names case.pc_lhs) cases
-      in
-      extract_param_names params @ case_params
-  | Pexp_constraint (e, _) -> extract_function_params e
-  | Pexp_newtype (_, e) -> extract_function_params e
-  | _ -> (
-      match extract_platform_match expr with
-      | Some (_, cases) ->
-          List.concat_map
-            (fun (case : Parsetree.case) -> extract_function_params case.pc_rhs)
-            cases
-      | None -> [])
-
-let rec extract_label_names (expr : Parsetree.expression) : string list =
-  match expr.pexp_desc with
-  | Pexp_function (params, _, _) ->
-      List.filter_map
-        (fun (p : Parsetree.function_param) ->
-          match p.pparam_desc with
-          | Pparam_val (Labelled name, _, _) | Pparam_val (Optional name, _, _)
-            ->
-              Some name
-          | _ -> None)
-        params
-  | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> extract_label_names e
-  | _ -> (
-      match extract_platform_match expr with
-      | Some (_, cases) ->
-          List.concat_map
-            (fun (case : Parsetree.case) -> extract_label_names case.pc_rhs)
-            cases
-      | None -> [])
-
-let get_idents (expression : Parsetree.expression) =
-  let is_operator name =
-    String.length name > 0
-    &&
-    let c = name.[0] in
-    not (Char.equal c '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
-  in
-  let add_values values_rev new_values =
-    List.rev_append new_values values_rev
-  in
-  let rec collect (expression : Parsetree.expression) (ids_rev, values_rev) =
-    match expression.pexp_desc with
-    | Pexp_ident { txt = ident; _ } -> (ident :: ids_rev, values_rev)
-    | Pexp_let (_, value_bindings, expr) ->
-        let ids_rev, values_rev =
-          List.fold_left
-            (fun (ids_rev, values_rev) value ->
-              let binding_names = extract_pattern_names value.pvb_pat in
-              let func_params = extract_function_params value.pvb_expr in
-              let values_rev =
-                values_rev |> add_values binding_names |> add_values func_params
-              in
-              collect value.pvb_expr (ids_rev, values_rev))
-            (ids_rev, values_rev) value_bindings
-        in
-        collect expr (ids_rev, values_rev)
-    | Pexp_function (params, _, Pfunction_body body) ->
-        let ids_rev, values_rev =
-          List.fold_left
-            (fun (ids_rev, values_rev) (p : Parsetree.function_param) ->
-              match p.pparam_desc with
-              | Pparam_val (_, default_arg, pat) ->
-                  let ids_rev, values_rev =
-                    match default_arg with
-                    | None -> (ids_rev, values_rev)
-                    | Some e -> collect e (ids_rev, values_rev)
-                  in
-                  (ids_rev, add_values values_rev (extract_pattern_names pat))
-              | Pparam_newtype _ -> (ids_rev, values_rev))
-            (ids_rev, values_rev) params
-        in
-        collect body (ids_rev, values_rev)
-    | Pexp_function (params, _, Pfunction_cases (cases, _, _)) ->
-        let ids_rev, values_rev =
-          List.fold_left
-            (fun (ids_rev, values_rev) (p : Parsetree.function_param) ->
-              match p.pparam_desc with
-              | Pparam_val (_, default_arg, pat) ->
-                  let ids_rev, values_rev =
-                    match default_arg with
-                    | None -> (ids_rev, values_rev)
-                    | Some e -> collect e (ids_rev, values_rev)
-                  in
-                  (ids_rev, add_values values_rev (extract_pattern_names pat))
-              | Pparam_newtype _ -> (ids_rev, values_rev))
-            (ids_rev, values_rev) params
-        in
-        List.fold_left
-          (fun (ids_rev, values_rev) case ->
-            let case_bindings = extract_pattern_names case.pc_lhs in
-            let values_rev = add_values values_rev case_bindings in
-            let ids_rev, values_rev =
-              match case.pc_guard with
-              | None -> (ids_rev, values_rev)
-              | Some guard -> collect guard (ids_rev, values_rev)
-            in
-            collect case.pc_rhs (ids_rev, values_rev))
-          (ids_rev, values_rev) cases
-    | Pexp_constraint (expr, _) -> collect expr (ids_rev, values_rev)
-    | Pexp_newtype (_, expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_apply (fn_expr, labeled_expr) ->
-        let ids_rev =
-          match fn_expr.pexp_desc with
-          | Pexp_ident { txt = Lident name as ident; _ }
-            when not (is_operator name) ->
-              ident :: ids_rev
-          | _ -> ids_rev
-        in
-        List.fold_left
-          (fun (ids_rev, values_rev) (_, arg_expr) ->
-            collect arg_expr (ids_rev, values_rev))
-          (ids_rev, values_rev) labeled_expr
-    | Pexp_match (expr, cases) ->
-        let ids_rev, values_rev = collect expr (ids_rev, values_rev) in
-        List.fold_left
-          (fun (ids_rev, values_rev) case ->
-            let case_bindings = extract_pattern_names case.pc_lhs in
-            let values_rev = add_values values_rev case_bindings in
-            collect case.pc_rhs (ids_rev, values_rev))
-          (ids_rev, values_rev) cases
-    | Pexp_try (expr, cases) ->
-        let ids_rev, values_rev = collect expr (ids_rev, values_rev) in
-        List.fold_left
-          (fun (ids_rev, values_rev) case ->
-            let case_bindings = extract_pattern_names case.pc_lhs in
-            let values_rev = add_values values_rev case_bindings in
-            collect case.pc_rhs (ids_rev, values_rev))
-          (ids_rev, values_rev) cases
-    | Pexp_tuple exprs ->
-        List.fold_left
-          (fun acc expr -> collect expr acc)
-          (ids_rev, values_rev) exprs
-    | Pexp_construct ({ txt = Lident "None"; _ }, _) -> (ids_rev, values_rev)
-    | Pexp_construct (_, Some expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_variant (_, Some expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_record (fields, Some expr) ->
-        let ids_rev, values_rev = collect expr (ids_rev, values_rev) in
-        List.fold_left
-          (fun acc (_, expr) -> collect expr acc)
-          (ids_rev, values_rev) fields
-    | Pexp_record (fields, None) ->
-        List.fold_left
-          (fun acc (_, expr) -> collect expr acc)
-          (ids_rev, values_rev) fields
-    | Pexp_field (expr, _) -> collect expr (ids_rev, values_rev)
-    | Pexp_setfield (expr1, _, expr2) ->
-        let ids_rev, values_rev = collect expr1 (ids_rev, values_rev) in
-        collect expr2 (ids_rev, values_rev)
-    | Pexp_array exprs ->
-        List.fold_left
-          (fun acc expr -> collect expr acc)
-          (ids_rev, values_rev) exprs
-    | Pexp_ifthenelse (expr1, expr2, None) ->
-        let ids_rev, values_rev = collect expr1 (ids_rev, values_rev) in
-        collect expr2 (ids_rev, values_rev)
-    | Pexp_ifthenelse (expr1, expr2, Some expr3) ->
-        let ids_rev, values_rev = collect expr1 (ids_rev, values_rev) in
-        let ids_rev, values_rev = collect expr2 (ids_rev, values_rev) in
-        collect expr3 (ids_rev, values_rev)
-    | Pexp_sequence (expr, seq_expr) ->
-        let ids_rev, values_rev = collect expr (ids_rev, values_rev) in
-        collect seq_expr (ids_rev, values_rev)
-    | Pexp_while (expr1, expr2) ->
-        let ids_rev, values_rev = collect expr1 (ids_rev, values_rev) in
-        collect expr2 (ids_rev, values_rev)
-    | Pexp_for (pat, expr1, expr2, _, expr3) ->
-        let loop_var = extract_pattern_names pat in
-        let values_rev = add_values values_rev loop_var in
-        let ids_rev, values_rev = collect expr1 (ids_rev, values_rev) in
-        let ids_rev, values_rev = collect expr2 (ids_rev, values_rev) in
-        collect expr3 (ids_rev, values_rev)
-    | Pexp_coerce (expr, _, _) -> collect expr (ids_rev, values_rev)
-    | Pexp_send (expr, _) -> collect expr (ids_rev, values_rev)
-    | Pexp_setinstvar (_, expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_override fields ->
-        List.fold_left
-          (fun acc (_, expr) -> collect expr acc)
-          (ids_rev, values_rev) fields
-    | Pexp_letmodule (_, _, expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_letexception (_, expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_assert expr -> collect expr (ids_rev, values_rev)
-    | Pexp_lazy expr -> collect expr (ids_rev, values_rev)
-    | Pexp_poly (expr, _) -> collect expr (ids_rev, values_rev)
-    | Pexp_open (_, expr) -> collect expr (ids_rev, values_rev)
-    | Pexp_letop { let_; ands; body } ->
-        let ids_rev, values_rev = collect let_.pbop_exp (ids_rev, values_rev) in
-        let binding_names = extract_pattern_names let_.pbop_pat in
-        let ids_rev, values_rev =
-          List.fold_left
-            (fun (ids_rev, values_rev) and_op ->
-              let ids_rev, values_rev =
-                collect and_op.pbop_exp (ids_rev, values_rev)
-              in
-              let and_names = extract_pattern_names and_op.pbop_pat in
-              (ids_rev, add_values values_rev and_names))
-            (ids_rev, values_rev) ands
-        in
-        let values_rev = add_values values_rev binding_names in
-        collect body (ids_rev, values_rev)
-    | Pexp_extension _ -> (
-        match extract_browser_only_payload expression with
-        | Some payload -> collect payload (ids_rev, values_rev)
-        | None -> (
-            match platform_client_case expression with
-            | Some case ->
-                let values_rev =
-                  add_values values_rev (extract_pattern_names case.pc_lhs)
-                in
-                collect case.pc_rhs (ids_rev, values_rev)
-            | None -> (ids_rev, values_rev)))
-    | _ -> (ids_rev, values_rev)
-  in
-  let ids_rev, values_rev = collect expression ([], []) in
-  { used_idents = List.rev ids_rev; bound_names = List.rev values_rev }
-
-let rec get_function_body (expr : Parsetree.expression) :
-    Parsetree.expression option =
-  match expr.pexp_desc with
-  | Pexp_function (_, _, Pfunction_body body) -> Some body
-  | Pexp_function (_, _, Pfunction_cases _) -> Some expr
-  | Pexp_constraint (e, _) -> get_function_body e
-  | _ -> (
-      match extract_browser_only_payload expr with
-      | Some payload -> get_function_body payload
-      | None -> None)
-
-let hooks_with_deps =
-  let variants = [ ""; "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7" ] in
-  let prefixes = [ "React."; "" ] in
-  let hooks =
-    [
-      "useEffect";
-      "useLayoutEffect";
-      "useInsertionEffect";
-      "useCallback";
-      "useMemo";
-    ]
-  in
-  List.concat_map
-    (fun hook ->
-      List.concat_map
-        (fun variant ->
-          List.map (fun prefix -> prefix ^ hook ^ variant) prefixes)
-        variants)
-    hooks
-
-let hooks_with_deps_set = StringSet.of_list hooks_with_deps
-let is_hook_with_deps name = StringSet.mem name hooks_with_deps_set
+let unique_path_strings (paths : Deps.path list) =
+  paths |> List.map Deps.path_to_string |> unique_strings
 
 let is_reason_file (ctx : Expansion_context.Base.t) =
   let filename = Expansion_context.Base.input_name ctx in
@@ -410,109 +78,57 @@ let suppress_exhaustive_deps_hint ~is_reason =
   else
     "To suppress this warning, add [@disable_exhaustive_deps] to the expression"
 
-let starts_with affix str =
-  let affix_len = String.length affix in
-  String.length str >= affix_len && String.sub str 0 affix_len = affix
-
 let format_deps (deps : string list) : string =
   match deps with
   | [] -> "[||]"
   | [ dep ] -> "[| " ^ dep ^ " |]"
   | _ -> "(" ^ String.concat ", " deps ^ ")"
 
-let hooks_base_names =
-  [
-    "useEffect";
-    "useLayoutEffect";
-    "useInsertionEffect";
-    "useCallback";
-    "useMemo";
-  ]
-
-let decode_hook_name (name : string) : (string * string * int option) option =
-  let prefixes = [ "React."; "" ] in
-  let try_parse prefix base =
-    let full_base = prefix ^ base in
-    if starts_with full_base name then
-      let suffix =
-        String.sub name (String.length full_base)
-          (String.length name - String.length full_base)
-      in
-      match suffix with
-      | "" -> Some (prefix, base, None)
-      | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" ->
-          Some (prefix, base, Some (int_of_string suffix))
-      | _ -> None
-    else None
-  in
-  let all_combinations =
-    List.concat_map
-      (fun base -> List.map (fun prefix -> (prefix, base)) prefixes)
-      hooks_base_names
-  in
-  List.find_map (fun (prefix, base) -> try_parse prefix base) all_combinations
-
-let make_hook_name ~prefix ~base ~variant =
-  prefix ^ base ^ string_of_int variant
-
 let has_attribute name attrs =
   attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = name)
 
-let check_duplicate_deps ~is_reason ~deps_loc dependencies_names =
-  let duplicate_deps = find_duplicates dependencies_names in
+let check_duplicate_deps ~is_reason ~deps_loc (declared_paths : Deps.path list)
+    =
+  let duplicate_deps =
+    find_duplicates (List.map Deps.path_to_string declared_paths)
+  in
   if duplicate_deps = [] then []
   else
-    let duplicates_str =
-      duplicate_deps |> List.map quotes |> String.concat ", "
-    in
     let msg =
       Printf.sprintf
         "exhaustive-deps: Duplicate %s %s in the dependency array.\n%s"
         (if List.length duplicate_deps = 1 then "dependency" else "dependencies")
-        duplicates_str
+        (quoted_list duplicate_deps)
         (suppress_exhaustive_deps_hint ~is_reason)
     in
     [ Driver.Lint_error.of_string deps_loc msg ]
 
 let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
     ~callback_arg ~all_deps ~total_dep_count =
-  let hook_info = decode_hook_name name in
+  let hook_info = Hook.With_deps.decode name in
+  let needs_rename (info : Hook.With_deps.t) =
+    match info.variant with None -> true | Some n -> n <> total_dep_count
+  in
   let register_hook_rename ~loc hook_info =
     match hook_info with
-    | Some (prefix, base, current_variant) ->
-        let needs_rename =
-          match current_variant with
-          | None -> true
-          | Some n -> n <> total_dep_count
-        in
-        if needs_rename then
-          let new_name =
-            make_hook_name ~prefix ~base ~variant:total_dep_count
-          in
-          Driver.register_correction ~loc ~repl:new_name
-    | None -> ()
+    | Some info when needs_rename info ->
+        let new_name = Hook.With_deps.with_variant info total_dep_count in
+        Driver.register_correction ~loc ~repl:new_name
+    | Some _ | None -> ()
   in
   match deps_arg with
   | None -> (
       match (hook_info, callback_arg) with
-      | Some (prefix, base, current_variant), Some (_, callback_expr) ->
-          let needs_rename =
-            match current_variant with
-            | None -> true
-            | Some n -> n <> total_dep_count
+      | Some info, Some (_, callback_expr) when needs_rename info ->
+          let callback_str =
+            Format.asprintf "%a" Pprintast.expression callback_expr
           in
-          if needs_rename then
-            let callback_str =
-              Format.asprintf "%a" Pprintast.expression callback_expr
-            in
-            let new_name =
-              make_hook_name ~prefix ~base ~variant:total_dep_count
-            in
-            let corrected_deps = format_deps all_deps in
-            let full_correction =
-              Printf.sprintf "%s (%s) %s" new_name callback_str corrected_deps
-            in
-            Driver.register_correction ~loc:expr_loc ~repl:full_correction
+          let new_name = Hook.With_deps.with_variant info total_dep_count in
+          let corrected_deps = format_deps all_deps in
+          let full_correction =
+            Printf.sprintf "%s (%s) %s" new_name callback_str corrected_deps
+          in
+          Driver.register_correction ~loc:expr_loc ~repl:full_correction
       | _ -> ())
   | Some _ ->
       let corrected_deps = format_deps all_deps in
@@ -522,20 +138,34 @@ let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
 let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
     ~callback_arg ~(static_deps : StringSet.t)
     ~(component_scope_bindings : StringSet.t)
-    ~(qualified_body_idents : StringSet.t) ~dependencies_names
-    ~body_idents_inside_scope =
+    ~(declared_paths : Deps.path list) ~(body_paths : Deps.path list) =
+  let uncovered_paths =
+    body_paths
+    |> List.filter (fun path ->
+        let root = Deps.root_name path in
+        StringSet.mem root component_scope_bindings
+        && (not (Deps.is_qualified path))
+        && not (StringSet.mem root static_deps))
+    |> List.filter (fun path ->
+        not
+          (List.exists
+             (fun declared -> Deps.is_prefix ~prefix:declared ~path)
+             declared_paths))
+  in
   let missing =
-    diff body_idents_inside_scope dependencies_names
-    |> List.filter (fun dep ->
-        StringSet.mem dep component_scope_bindings
-        && (not (StringSet.mem dep qualified_body_idents))
-        && not (StringSet.mem dep static_deps))
-    |> unique_strings
+    (* When both a path and one of its prefixes are missing, the prefix covers
+       it: report only the shallowest paths ('input' subsumes 'input.page'). *)
+    uncovered_paths
+    |> List.filter (fun path ->
+        not
+          (List.exists
+             (fun other -> Deps.is_strict_prefix ~prefix:other ~path)
+             uncovered_paths))
+    |> unique_path_strings
   in
   if missing = [] then []
   else
-    let missing_str = missing |> List.map quotes |> String.concat ", " in
-    let all_deps = (dependencies_names |> unique_strings) @ missing in
+    let all_deps = unique_path_strings declared_paths @ missing in
     let total_dep_count = List.length all_deps in
     if !enable_corrections_flag then
       register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc
@@ -544,31 +174,24 @@ let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
       Printf.sprintf
         "exhaustive-deps: Missing %s %s from the dependency array.\n%s"
         (if List.length missing = 1 then "dependency" else "dependencies")
-        missing_str
+        (quoted_list missing)
         (suppress_exhaustive_deps_hint ~is_reason)
     in
     [ Driver.Lint_error.of_string deps_loc msg ]
 
 let check_outer_scope_deps ~is_reason ~deps_loc ~name
-    ~(outer_scope_bindings : StringSet.t) ~dependencies_names
-    ~dependencies_idents =
+    ~(outer_scope_bindings : StringSet.t) ~(declared_paths : Deps.path list) =
   let outer_scope_deps =
-    dependencies_names
-    |> List.filter (fun dep -> StringSet.mem dep outer_scope_bindings)
-    |> unique_strings
+    declared_paths
+    |> List.filter (fun path ->
+        StringSet.mem (Deps.root_name path) outer_scope_bindings)
   in
-  let external_module_deps =
-    dependencies_idents.used_idents
-    |> List.filter_map (fun lid ->
-        match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
-    |> unique_strings
-  in
+  let external_module_deps = List.filter Deps.is_qualified declared_paths in
   let all_outer_scope =
-    outer_scope_deps @ external_module_deps |> unique_strings
+    unique_path_strings (outer_scope_deps @ external_module_deps)
   in
   if all_outer_scope = [] then []
   else
-    let deps_str = all_outer_scope |> List.map quotes |> String.concat ", " in
     let msg =
       Printf.sprintf
         "exhaustive-deps: %s has %s: %s. Outer scope values like %s aren't \
@@ -578,7 +201,7 @@ let check_outer_scope_deps ~is_reason ~deps_loc ~name
         name
         (if List.length all_outer_scope = 1 then "an unnecessary dependency"
          else "unnecessary dependencies")
-        deps_str
+        (quoted_list all_outer_scope)
         (List.hd all_outer_scope |> quotes)
         (suppress_exhaustive_deps_hint ~is_reason)
     in
@@ -611,7 +234,7 @@ let check_no_deps_effect ~(static_deps : StringSet.t) ~name ~loc callback_arg :
     match callback_arg with
     | Some (_, fn_expr) ->
         Option.bind
-          (get_function_body fn_expr)
+          (Bindings.function_body fn_expr)
           (find_direct_setter_call ~setters:static_deps)
     | None -> None
   in
@@ -640,31 +263,24 @@ let check_hook_deps_exhaustiveness (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
     ~(component_scope_bindings : StringSet.t) ~name ~fn_loc ~deps_arg ~args
     (e : Parsetree.expression) : Driver.Lint_error.t list =
-  let body_idents =
-    (match List.nth_opt args 0 with
-      | Some (_, fn_expr) -> get_function_body fn_expr
+  let callback_arg = List.nth_opt args 0 in
+  let body_deps =
+    (match callback_arg with
+      | Some (_, fn_expr) -> Bindings.function_body fn_expr
       | _ -> None)
-    |> Option.map get_idents
-    |> Option.value ~default:{ used_idents = []; bound_names = [] }
+    |> Option.map Deps.of_expression
+    |> Option.value ~default:{ Deps.used_paths = []; bound_names = [] }
   in
-  let body_idents_inside_scope =
-    diff
-      (body_idents.used_idents |> List.map Longident.name)
-      body_idents.bound_names
+  let bound_names = StringSet.of_list body_deps.bound_names in
+  let body_paths =
+    body_deps.used_paths
+    |> List.filter (fun path ->
+        not (StringSet.mem (Deps.root_name path) bound_names))
   in
-  let qualified_body_idents =
-    body_idents.used_idents
-    |> List.filter_map (fun lid ->
-        match lid with Ldot _ -> Some (Longident.name lid) | _ -> None)
-    |> StringSet.of_list
-  in
-  let dependencies_idents =
+  let declared_paths =
     deps_arg
-    |> Option.map (fun (_, deps) -> get_idents deps)
-    |> Option.value ~default:{ used_idents = []; bound_names = [] }
-  in
-  let dependencies_names =
-    dependencies_idents.used_idents |> List.map Longident.name
+    |> Option.map (fun (_, deps) -> (Deps.of_expression deps).used_paths)
+    |> Option.value ~default:[]
   in
   let deps_loc =
     match deps_arg with
@@ -672,13 +288,12 @@ let check_hook_deps_exhaustiveness (ctx : Expansion_context.Base.t)
     | None -> e.pexp_loc
   in
   let is_reason = is_reason_file ctx in
-  check_duplicate_deps ~is_reason ~deps_loc dependencies_names
+  check_duplicate_deps ~is_reason ~deps_loc declared_paths
   @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc:e.pexp_loc
-      ~deps_arg ~callback_arg:(List.nth_opt args 0) ~static_deps
-      ~component_scope_bindings ~qualified_body_idents ~dependencies_names
-      ~body_idents_inside_scope
+      ~deps_arg ~callback_arg ~static_deps ~component_scope_bindings
+      ~declared_paths ~body_paths
   @ check_outer_scope_deps ~is_reason ~deps_loc ~name ~outer_scope_bindings
-      ~dependencies_names ~dependencies_idents
+      ~declared_paths
 
 let check_hook_deps (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
@@ -689,7 +304,7 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
       ( { pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ },
         args ) -> (
       let name = Longident.name lident in
-      if not (is_hook_with_deps name) then []
+      if not (Hook.With_deps.takes_deps name) then []
       else
         let deps_arg = List.nth_opt args 1 in
         let is_disabled =
@@ -703,179 +318,24 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
         in
         if is_disabled then []
         else
-          match (deps_arg, decode_hook_name name) with
+          match (deps_arg, Hook.With_deps.decode name) with
           | ( None,
               Some
-                ( _,
-                  ("useEffect" | "useLayoutEffect" | "useInsertionEffect"),
-                  None ) ) ->
+                {
+                  base = "useEffect" | "useLayoutEffect" | "useInsertionEffect";
+                  variant = None;
+                  _;
+                } ) ->
               check_no_deps_effect ~static_deps ~name ~loc:e.pexp_loc
                 (List.nth_opt args 0)
-          | None, Some (_, ("useMemo" | "useCallback"), None) ->
+          | None, Some { base = "useMemo" | "useCallback"; variant = None; _ }
+            ->
               no_deps_memo_error ~name ~loc:e.pexp_loc
           | _ ->
               check_hook_deps_exhaustiveness ctx ~static_deps
                 ~outer_scope_bindings ~component_scope_bindings ~name ~fn_loc
                 ~deps_arg ~args e)
   | _ -> []
-
-let get_name longident =
-  match longident with Lident l -> Some l | Ldot (_, l) -> Some l | _ -> None
-
-let is_a_hook_name name =
-  let len = String.length name in
-  if len = 3 then name = "use"
-  else
-    len >= 4
-    && name.[0] = 'u'
-    && name.[1] = 's'
-    && name.[2] = 'e'
-    && ((name.[3] >= 'A' && name.[3] <= 'Z')
-       || name.[3] = '_'
-       || name.[3] = '\''
-       || (name.[3] >= '0' && name.[3] <= '9'))
-
-let is_a_hook longident =
-  match get_name longident with
-  | Some name -> is_a_hook_name name
-  | None -> false
-
-let contains_jsx (attrs : attributes) =
-  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = "JSX")
-
-let hook_call_ident (expr : Parsetree.expression) : Longident.t option =
-  match expr.pexp_desc with
-  | Pexp_apply ({ pexp_desc = Pexp_ident { txt; _ }; _ }, _)
-    when not (contains_jsx expr.pexp_attributes) ->
-      Some txt
-  | _ -> None
-
-type stable_shape = Snd | All
-
-let rec body_of_fun_chain (e : Parsetree.expression) : Parsetree.expression =
-  match e.pexp_desc with
-  | Pexp_function (_, _, Pfunction_body body) -> body_of_fun_chain body
-  | Pexp_function
-      (_, _, Pfunction_cases ([ { pc_guard = None; pc_rhs; _ } ], _, _)) ->
-      body_of_fun_chain pc_rhs
-  | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> body_of_fun_chain e
-  | _ -> (
-      match platform_client_case e with
-      | Some case -> body_of_fun_chain case.pc_rhs
-      | None -> e)
-
-let stable_shape_of_call ~(stable_hooks : stable_shape StringMap.t)
-    (expr : Parsetree.expression) : stable_shape option =
-  match hook_call_ident expr with
-  | Some txt -> (
-      match Longident.name txt with
-      | "useState" | "React.useState" | "useReducer" | "React.useReducer" ->
-          Some Snd
-      | "useRef" | "React.useRef" -> Some All
-      | _ -> (
-          match txt with
-          | Lident name -> StringMap.find_opt name stable_hooks
-          | _ -> None))
-  | None -> None
-
-let stable_wrapper_shape ~stable_hooks (vb : Parsetree.value_binding) :
-    (string * stable_shape) option =
-  match vb.pvb_pat.ppat_desc with
-  | Ppat_var { txt = name; _ } when is_a_hook_name name -> (
-      match
-        stable_shape_of_call ~stable_hooks (body_of_fun_chain vb.pvb_expr)
-      with
-      | Some shape -> Some (name, shape)
-      | None -> None)
-  | _ -> None
-
-let looks_like_stable_setter name =
-  starts_with "dispatch" name
-  || starts_with "set" name
-     && String.length name > 3
-     && ((name.[3] >= 'A' && name.[3] <= 'Z') || name.[3] = '_')
-
-let is_any_hook_call (expr : Parsetree.expression) =
-  match hook_call_ident expr with Some txt -> is_a_hook txt | None -> false
-
-let get_second_tuple_element_names (pattern : Parsetree.pattern) : string list =
-  match pattern.ppat_desc with
-  | Ppat_tuple (_ :: pat2 :: _) -> extract_pattern_names pat2
-  | _ -> []
-
-let record_setter_bound_names (pattern : Parsetree.pattern) : string list =
-  match pattern.ppat_desc with
-  | Ppat_record (fields, _) ->
-      fields
-      |> List.filter_map
-           (fun
-             ((field : Longident.t Location.loc), (pat : Parsetree.pattern)) ->
-             match get_name field.txt with
-             | Some field_name when looks_like_stable_setter field_name ->
-                 Some (extract_pattern_names pat)
-             | _ -> None)
-      |> List.concat
-  | _ -> []
-
-let extract_static_deps_from_binding ~stable_hooks
-    (vb : Parsetree.value_binding) : string list =
-  let expr =
-    match platform_client_case vb.pvb_expr with
-    | Some case -> case.pc_rhs
-    | None -> vb.pvb_expr
-  in
-  let pattern = vb.pvb_pat in
-  match stable_shape_of_call ~stable_hooks expr with
-  | Some Snd -> get_second_tuple_element_names pattern
-  | Some All -> extract_pattern_names pattern
-  | None ->
-      if is_any_hook_call expr then
-        (get_second_tuple_element_names pattern
-        |> List.filter looks_like_stable_setter)
-        @ record_setter_bound_names pattern
-      else []
-
-exception Hook_found
-
-let hook_scanner =
-  object
-    inherit Ast_traverse.iter as super
-
-    method! expression e =
-      match hook_call_ident e with
-      | Some lident when is_a_hook lident -> raise Hook_found
-      | _ -> super#expression e
-  end
-
-let has_any_hooks (structure : Parsetree.structure) : bool =
-  try
-    hook_scanner#structure structure;
-    false
-  with Hook_found -> true
-
-let expression_has_hook_calls (expr : Parsetree.expression) : bool =
-  try
-    hook_scanner#expression expr;
-    false
-  with Hook_found -> true
-
-let is_browser_only_hook_wrapper (vb : Parsetree.value_binding) : bool =
-  match get_function_body vb.pvb_expr with
-  | Some _ -> expression_has_hook_calls vb.pvb_expr
-  | None -> (
-      match vb.pvb_expr.pexp_desc with
-      | Pexp_ident { txt; _ } -> is_a_hook txt
-      | _ -> false)
-
-let browser_only_hook_names (vbs : Parsetree.value_binding list) : string list =
-  vbs
-  |> List.filter is_browser_only_hook_wrapper
-  |> List.concat_map (fun (vb : Parsetree.value_binding) ->
-      extract_pattern_names vb.pvb_pat)
-
-let is_tracked_browser_only_hook (lident : Longident.t) (tracked : StringSet.t)
-    : bool =
-  match lident with Lident name -> StringSet.mem name tracked | _ -> false
 
 type hook_context = {
   is_inside_component : bool;
@@ -886,11 +346,7 @@ type hook_context = {
 
 type analysis_state = {
   context : hook_context;
-  static_deps : StringSet.t;
-  outer_scope_bindings : StringSet.t;
-  component_scope_bindings : StringSet.t;
-  browser_only_hooks : StringSet.t;
-  stable_hooks : stable_shape StringMap.t;
+  scope : Scope.t;
   lint_errors_rev : Driver.Lint_error.t list;
   conditional_locations_rev : Location.t list;
   outside_locations_rev : Location.t list;
@@ -901,28 +357,6 @@ type analysis = {
   conditional_locations : Location.t list;
   outside_locations : Location.t list;
 }
-
-type binding_kind = Component | Custom_hook | Function | Value
-
-let classify_binding (t : Parsetree.value_binding) =
-  let is_function =
-    match extract_platform_match t.pvb_expr with
-    | Some (_, cases) ->
-        List.exists
-          (fun (case : Parsetree.case) ->
-            Option.is_some (get_function_body case.pc_rhs))
-          cases
-    | None -> Option.is_some (get_function_body t.pvb_expr)
-  in
-  if not is_function then Value
-  else
-    let names = extract_pattern_names t.pvb_pat in
-    if
-      has_attribute "react.component" t.pvb_attributes
-      || has_attribute "react.component" t.pvb_pat.ppat_attributes
-    then Component
-    else if List.exists is_a_hook_name names then Custom_hook
-    else Function
 
 let analysis_cache : (string, analysis) Hashtbl.t = Hashtbl.create 16
 
@@ -938,98 +372,27 @@ let initial_state =
         is_inside_conditional = false;
         is_inside_jsx = false;
       };
-    static_deps = StringSet.empty;
-    outer_scope_bindings = StringSet.empty;
-    component_scope_bindings = StringSet.empty;
-    browser_only_hooks = StringSet.empty;
-    stable_hooks = StringMap.empty;
+    scope = Scope.initial;
     lint_errors_rev = [];
     conditional_locations_rev = [];
     outside_locations_rev = [];
   }
 
-let record_binding_scopes kind (t : Parsetree.value_binding) state =
-  let binding_names = extract_pattern_names t.pvb_pat in
-  let state =
-    {
-      state with
-      browser_only_hooks =
-        StringSet.diff state.browser_only_hooks
-          (StringSet.of_list binding_names);
-      stable_hooks =
-        List.fold_left
-          (fun map name -> StringMap.remove name map)
-          state.stable_hooks binding_names;
-    }
-  in
-  let is_plain_binding = kind = Value || kind = Function in
-  let in_scope =
-    state.context.is_inside_component || state.context.is_inside_custom_hook
-  in
-  let state =
-    if not is_plain_binding then state
-    else if in_scope then
-      {
-        state with
-        component_scope_bindings =
-          StringSet.union state.component_scope_bindings
-            (StringSet.of_list binding_names);
-      }
-    else
-      {
-        state with
-        outer_scope_bindings =
-          StringSet.union state.outer_scope_bindings
-            (StringSet.of_list binding_names);
-      }
-  in
-  let state =
-    match
-      extract_static_deps_from_binding ~stable_hooks:state.stable_hooks t
-    with
-    | [] -> state
-    | new_static_deps ->
-        {
-          state with
-          static_deps =
-            StringSet.union state.static_deps
-              (StringSet.of_list new_static_deps);
-        }
-  in
-  match stable_wrapper_shape ~stable_hooks:state.stable_hooks t with
-  | Some (name, shape) ->
-      { state with stable_hooks = StringMap.add name shape state.stable_hooks }
-  | None -> state
-
-let binding_body_state kind (t : Parsetree.value_binding) state =
+let binding_body_context (kind : Scope.kind) context =
   match kind with
   | Component | Custom_hook ->
-      let function_params =
-        StringSet.of_list
-          (extract_function_params t.pvb_expr @ extract_label_names t.pvb_expr)
-      in
       {
-        state with
-        context =
-          {
-            state.context with
-            is_inside_component = kind = Component;
-            is_inside_custom_hook = kind = Custom_hook;
-          };
-        static_deps = StringSet.empty;
-        component_scope_bindings = function_params;
+        context with
+        is_inside_component = kind = Scope.Component;
+        is_inside_custom_hook = kind = Scope.Custom_hook;
       }
   | Function ->
       {
-        state with
-        context =
-          {
-            state.context with
-            is_inside_component = false;
-            is_inside_custom_hook = false;
-          };
+        context with
+        is_inside_component = false;
+        is_inside_custom_hook = false;
       }
-  | Value -> state
+  | Value -> context
 
 let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
     ~check_order_of_hooks =
@@ -1037,40 +400,39 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
     inherit [analysis_state] Ast_traverse.fold as super
 
     method! value_binding t state =
-      if not check_order_of_hooks then super#value_binding t state
-      else self#binding_with_kind (classify_binding t) t state
+      self#binding_with_kind (Scope.classify t) t state
 
     method private browser_only_binding vb state =
       if
-        check_order_of_hooks
-        && is_browser_only_hook_wrapper vb
-        && Option.is_some (get_function_body vb.pvb_expr)
-      then self#binding_with_kind Custom_hook vb state
+        Scope.is_browser_only_hook_wrapper vb
+        && Option.is_some (Bindings.function_body vb.pvb_expr)
+      then self#binding_with_kind Scope.Custom_hook vb state
       else self#value_binding vb state
 
     method private binding_with_kind kind t state =
-      let prepared = record_binding_scopes kind t state in
-      let after = super#value_binding t (binding_body_state kind t prepared) in
-      let enters_new_scope = kind = Component || kind = Custom_hook in
-      let restore saved traversed =
-        if enters_new_scope then saved else traversed
+      let in_component_or_hook =
+        state.context.is_inside_component || state.context.is_inside_custom_hook
       in
+      let entered =
+        Scope.enter_binding kind ~in_component_or_hook t state.scope
+      in
+      let body_state =
+        {
+          state with
+          context = binding_body_context kind state.context;
+          scope = Scope.binding_body kind t entered;
+        }
+      in
+      let after = super#value_binding t body_state in
       {
         after with
         context = state.context;
-        static_deps = restore prepared.static_deps after.static_deps;
-        component_scope_bindings =
-          restore prepared.component_scope_bindings
-            after.component_scope_bindings;
-        stable_hooks = restore prepared.stable_hooks after.stable_hooks;
+        scope = Scope.exit_binding kind ~entered ~traversed:after.scope;
       }
 
     method! structure_item t state =
-      match t.pstr_desc with
-      | Pstr_extension
-          ( ( { txt = "browser_only"; _ },
-              PStr [ { pstr_desc = Pstr_value (_, vbs); _ } ] ),
-            _ ) ->
+      match Platform.browser_only_value_bindings t with
+      | Some vbs ->
           let state =
             List.fold_left
               (fun state vb -> self#browser_only_binding vb state)
@@ -1078,19 +440,19 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
           in
           {
             state with
-            browser_only_hooks =
-              StringSet.union state.browser_only_hooks
-                (StringSet.of_list (browser_only_hook_names vbs));
+            scope = Scope.track_browser_only_wrappers vbs state.scope;
           }
-      | _ -> super#structure_item t state
+      | None -> super#structure_item t state
 
     method private collect_exhaustive_deps_errors expr state =
       if not check_exhaustive then state
       else
         match
-          check_hook_deps ctx ~static_deps:state.static_deps
-            ~outer_scope_bindings:state.outer_scope_bindings
-            ~component_scope_bindings:state.component_scope_bindings expr
+          check_hook_deps ctx
+            ~static_deps:(Scope.static_deps state.scope)
+            ~outer_scope_bindings:(Scope.outer_bindings state.scope)
+            ~component_scope_bindings:(Scope.component_bindings state.scope)
+            expr
         with
         | [] -> state
         | errors ->
@@ -1103,11 +465,10 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
         ~is_outside_component_or_hook (expr : Parsetree.expression) state =
       if not check_order_of_hooks then state
       else
-        match hook_call_ident expr with
+        match Hook.call_ident expr with
         | Some lident
-          when is_a_hook lident
-               || is_tracked_browser_only_hook lident state.browser_only_hooks
-          ->
+          when Hook.is_hook_ident lident
+               || Scope.is_tracked_browser_only_hook state.scope lident ->
             if has_attribute "disable_order_of_hooks" expr.pexp_attributes then
               state
             else
@@ -1131,42 +492,29 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
 
     method! expression t state =
       let state =
-        if check_order_of_hooks then
-          {
-            state with
-            context =
-              {
-                state.context with
-                is_inside_jsx =
-                  state.context.is_inside_jsx || contains_jsx t.pexp_attributes;
-              };
-          }
-        else state
+        {
+          state with
+          context =
+            {
+              state.context with
+              is_inside_jsx =
+                state.context.is_inside_jsx || Hook.is_jsx t.pexp_attributes;
+            };
+        }
       in
       let hook_context = state.context in
       let mark_conditional state =
-        if check_order_of_hooks then
-          {
-            state with
-            context = { state.context with is_inside_conditional = true };
-          }
-        else state
+        {
+          state with
+          context = { state.context with is_inside_conditional = true };
+        }
       in
       let restore_context original_ctx state =
         { state with context = original_ctx }
       in
       let state =
-        match t.pexp_desc with
-        | Pexp_extension
-            ( { txt = "platform"; _ },
-              PStr
-                [
-                  {
-                    pstr_desc =
-                      Pstr_eval ({ pexp_desc = Pexp_match (scrut, cases); _ }, _);
-                    _;
-                  };
-                ] ) ->
+        match (Platform.match_payload t, Platform.browser_only_payload t) with
+        | Some (scrut, cases), _ ->
             let state = self#expression scrut state in
             let state =
               List.fold_left
@@ -1174,12 +522,12 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                 state cases
             in
             restore_context hook_context state
-        | Pexp_extension
-            ( { txt = "browser_only"; _ },
-              PStr [ { pstr_desc = Pstr_eval (payload, _); _ } ] ) -> (
+        | None, Some payload -> (
             match payload.pexp_desc with
             | Pexp_let (_, vbs, body) ->
-                let saved_browser_only = state.browser_only_hooks in
+                let saved_browser_only =
+                  Scope.browser_only_snapshot state.scope
+                in
                 let state =
                   List.fold_left
                     (fun state vb -> self#browser_only_binding vb state)
@@ -1188,120 +536,127 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                 let state =
                   {
                     state with
-                    browser_only_hooks =
-                      StringSet.union state.browser_only_hooks
-                        (StringSet.of_list (browser_only_hook_names vbs));
+                    scope = Scope.track_browser_only_wrappers vbs state.scope;
                   }
                 in
                 let state = self#expression body state in
                 let state =
-                  { state with browser_only_hooks = saved_browser_only }
+                  {
+                    state with
+                    scope =
+                      Scope.restore_browser_only saved_browser_only state.scope;
+                  }
                 in
                 restore_context hook_context state
             | _ ->
                 let state = self#expression payload state in
                 restore_context hook_context state)
-        | Pexp_match (expr, cases) ->
-            let state = self#expression expr state in
-            let state =
-              List.fold_left
-                (fun state case ->
-                  self#expression case.pc_rhs (mark_conditional state))
-                state cases
-            in
-            restore_context hook_context state
-        | Pexp_try (expr, cases) ->
-            let state = self#expression expr (mark_conditional state) in
-            let state =
-              List.fold_left
-                (fun state case ->
-                  self#expression case.pc_rhs (mark_conditional state))
-                state cases
-            in
-            restore_context hook_context state
-        | Pexp_while (cond, expr) ->
-            let state = self#expression cond state in
-            let state = self#expression expr (mark_conditional state) in
-            restore_context hook_context state
-        | Pexp_for (_, start_expr, end_expr, _, body) ->
-            let state = self#expression start_expr state in
-            let state = self#expression end_expr state in
-            let state = self#expression body (mark_conditional state) in
-            restore_context hook_context state
-        | Pexp_ifthenelse (if_expr, then_expr, else_expr) ->
-            let state = self#expression if_expr state in
-            let state = self#expression then_expr (mark_conditional state) in
-            let state =
-              match else_expr with
-              | Some expr -> self#expression expr (mark_conditional state)
-              | None -> state
-            in
-            restore_context hook_context state
-        | Pexp_lazy expr ->
-            let state = self#expression expr (mark_conditional state) in
-            restore_context hook_context state
-        | Pexp_assert expr ->
-            let state = self#expression expr (mark_conditional state) in
-            restore_context hook_context state
-        | Pexp_apply
-            ( { pexp_desc = Pexp_ident { txt = Lident ("&&" | "||"); _ }; _ },
-              args ) ->
-            let state =
-              List.fold_left
-                (fun state (_, arg_expr) ->
-                  self#expression arg_expr (mark_conditional state))
-                state args
-            in
-            restore_context hook_context state
-        | Pexp_function (params, _, func_body) ->
-            let saved_jsx_context = hook_context.is_inside_jsx in
-            let state =
-              List.fold_left
-                (fun state (p : Parsetree.function_param) ->
-                  match p.pparam_desc with
-                  | Pparam_val (_, default_arg, pattern) ->
-                      let state =
-                        match default_arg with
-                        | Some expr -> self#expression expr state
-                        | None -> state
-                      in
-                      self#pattern pattern state
-                  | Pparam_newtype _ -> state)
-                state params
-            in
-            let state_for_body =
-              {
-                state with
-                context =
-                  { state.context with is_inside_jsx = saved_jsx_context };
-              }
-            in
-            let state =
-              match func_body with
-              | Pfunction_body body -> self#expression body state_for_body
-              | Pfunction_cases (cases, _, _) ->
+        | None, None -> (
+            match t.pexp_desc with
+            | Pexp_match (expr, cases) ->
+                let state = self#expression expr state in
+                let state =
                   List.fold_left
-                    (fun state case -> self#case case state)
-                    state_for_body cases
-            in
-            restore_context hook_context state
-        | Pexp_apply ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
-          when is_hook_with_deps (Longident.name lident) ->
-            let callback_arg = List.nth_opt args 0 in
-            let deps_arg = List.nth_opt args 1 in
-            let state =
-              match callback_arg with
-              | Some (_, callback_expr) ->
-                  self#expression callback_expr (mark_conditional state)
-              | None -> state
-            in
-            let state =
-              match deps_arg with
-              | Some (_, deps_expr) -> self#expression deps_expr state
-              | None -> state
-            in
-            restore_context hook_context state
-        | _ -> super#expression t state
+                    (fun state case ->
+                      self#expression case.pc_rhs (mark_conditional state))
+                    state cases
+                in
+                restore_context hook_context state
+            | Pexp_try (expr, cases) ->
+                let state = self#expression expr (mark_conditional state) in
+                let state =
+                  List.fold_left
+                    (fun state case ->
+                      self#expression case.pc_rhs (mark_conditional state))
+                    state cases
+                in
+                restore_context hook_context state
+            | Pexp_while (cond, expr) ->
+                let state = self#expression cond state in
+                let state = self#expression expr (mark_conditional state) in
+                restore_context hook_context state
+            | Pexp_for (_, start_expr, end_expr, _, body) ->
+                let state = self#expression start_expr state in
+                let state = self#expression end_expr state in
+                let state = self#expression body (mark_conditional state) in
+                restore_context hook_context state
+            | Pexp_ifthenelse (if_expr, then_expr, else_expr) ->
+                let state = self#expression if_expr state in
+                let state =
+                  self#expression then_expr (mark_conditional state)
+                in
+                let state =
+                  match else_expr with
+                  | Some expr -> self#expression expr (mark_conditional state)
+                  | None -> state
+                in
+                restore_context hook_context state
+            | Pexp_lazy expr ->
+                let state = self#expression expr (mark_conditional state) in
+                restore_context hook_context state
+            | Pexp_assert expr ->
+                let state = self#expression expr (mark_conditional state) in
+                restore_context hook_context state
+            | Pexp_apply
+                ( { pexp_desc = Pexp_ident { txt = Lident ("&&" | "||"); _ }; _ },
+                  args ) ->
+                let state =
+                  List.fold_left
+                    (fun state (_, arg_expr) ->
+                      self#expression arg_expr (mark_conditional state))
+                    state args
+                in
+                restore_context hook_context state
+            | Pexp_function (params, _, func_body) ->
+                let saved_jsx_context = hook_context.is_inside_jsx in
+                let state =
+                  List.fold_left
+                    (fun state (p : Parsetree.function_param) ->
+                      match p.pparam_desc with
+                      | Pparam_val (_, default_arg, pattern) ->
+                          let state =
+                            match default_arg with
+                            | Some expr -> self#expression expr state
+                            | None -> state
+                          in
+                          self#pattern pattern state
+                      | Pparam_newtype _ -> state)
+                    state params
+                in
+                let state_for_body =
+                  {
+                    state with
+                    context =
+                      { state.context with is_inside_jsx = saved_jsx_context };
+                  }
+                in
+                let state =
+                  match func_body with
+                  | Pfunction_body body -> self#expression body state_for_body
+                  | Pfunction_cases (cases, _, _) ->
+                      List.fold_left
+                        (fun state case -> self#case case state)
+                        state_for_body cases
+                in
+                restore_context hook_context state
+            | Pexp_apply
+                ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
+              when Hook.With_deps.takes_deps (Longident.name lident) ->
+                let callback_arg = List.nth_opt args 0 in
+                let deps_arg = List.nth_opt args 1 in
+                let state =
+                  match callback_arg with
+                  | Some (_, callback_expr) ->
+                      self#expression callback_expr (mark_conditional state)
+                  | None -> state
+                in
+                let state =
+                  match deps_arg with
+                  | Some (_, deps_expr) -> self#expression deps_expr state
+                  | None -> state
+                in
+                restore_context hook_context state
+            | _ -> super#expression t state)
       in
       state
       |> self#collect_exhaustive_deps_errors t
@@ -1316,7 +671,7 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
 
 let compute_analysis (ctx : Expansion_context.Base.t)
     (structure : Parsetree.structure) : analysis =
-  if not (has_any_hooks structure) then empty_analysis
+  if not (Hook.structure_has_hook_calls structure) then empty_analysis
   else
     let check_exhaustive = not !disable_exhaustive_deps_flag in
     let check_order_of_hooks = not !disable_order_of_hooks_flag in

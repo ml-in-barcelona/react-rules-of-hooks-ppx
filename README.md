@@ -4,7 +4,9 @@ A ppx that validates React's [Rules of Hooks](https://react.dev/reference/rules/
 
 - Exhaustive dependencies in `useEffect`, `useMemo`, `useCallback`, etc.
 - Order of hooks: no conditional calls, top level only, and only inside
-  `[@react.component]` functions or custom hooks.
+  component functions or custom hooks. Recognized component attributes:
+  `[@react.component]`, `[@react.client.component]`, and
+  `[@react.async.component]`.
 
 ## Exhaustive dependencies
 
@@ -34,6 +36,14 @@ let make = (~randomProp) => {
          Error (warning 22): exhaustive-deps: Missing 'randomProp' in the dependency array.
          To suppress this warning, add [@disable_exhaustive_deps] before the expression
 ```
+
+Dependencies are tracked at member-path granularity, like
+eslint-plugin-react-hooks. `input.page` and `input.limit` are distinct
+dependencies. A declared `input.page` covers deeper uses such as
+`input.page.size`, but not `input.limit` and not the whole `input`; passing
+the whole record somewhere requires `input` itself. Duplicate detection,
+missing and unnecessary reports, and `-corrections` output all use the full
+member path.
 
 Effects without a dependency array (`React.useEffect(fn)`) run after every
 render and can never observe stale values, so they get no exhaustiveness

@@ -2,6 +2,28 @@
 
 ## 1.3.0
 
+- [FEAT] Member-path dependency tracking, as in eslint-plugin-react-hooks.
+  Dependencies and body uses are compared as full member paths, so
+  `(input.page, input.limit)` is no longer reported as a duplicate, and deps
+  `[|input.limit|]` over a body reading `input.page` now report a missing
+  `input.page`. A declared `input.page` covers deeper uses
+  (`input.page.size`) but not the whole record. Stable roots (setters, refs)
+  keep every path under them exempt (`ref.current`). Diagnostics and
+  `-corrections` output emit member paths.
+- [FEAT] `[@react.async.component]` bindings are recognized as components,
+  same as `[@react.component]`.
+- [FEAT] `[@react.client.component]` bindings are recognized as components,
+  same as `[@react.component]`: hooks at their top level are valid, and the
+  rules of hooks and exhaustive-deps checks apply inside them.
+- [FIX] `-disable-order-of-hooks` no longer silently degrades exhaustive-deps:
+  binding scope tracking (component-scope bindings, outer-scope bindings,
+  stable hooks) now runs regardless of the flag, so missing-dependency and
+  outer-scope warnings are still reported when only order-of-hooks checking
+  is disabled.
+- [INTERNAL] The implementation is split into `Platform`, `Hook`, `Bindings`,
+  `Deps`, `Stable` and `Scope` modules; each `.mli` documents its module's
+  contract. No behaviour change other than the fix above.
+
 - [FEAT] Understand server-reason-react platform branches: hooks inside
   `switch%platform` / `match%platform` branches are no longer flagged as
   conditional (branches are resolved at compile time, one per build target).
