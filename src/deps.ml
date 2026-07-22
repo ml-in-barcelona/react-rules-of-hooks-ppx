@@ -68,17 +68,7 @@ let of_expression (expression : Parsetree.expression) : t =
         match body with
         | Pfunction_body body -> collect body (paths_rev, values_rev)
         | Pfunction_cases (cases, _, _) ->
-            List.fold_left
-              (fun (paths_rev, values_rev) case ->
-                let case_bindings = Bindings.of_pattern case.pc_lhs in
-                let values_rev = add_values values_rev case_bindings in
-                let paths_rev, values_rev =
-                  match case.pc_guard with
-                  | None -> (paths_rev, values_rev)
-                  | Some guard -> collect guard (paths_rev, values_rev)
-                in
-                collect case.pc_rhs (paths_rev, values_rev))
-              (paths_rev, values_rev) cases)
+            List.fold_left collect_case (paths_rev, values_rev) cases)
     | Pexp_constraint (expr, _) -> collect expr (paths_rev, values_rev)
     | Pexp_newtype (_, expr) -> collect expr (paths_rev, values_rev)
     | Pexp_apply (fn_expr, labeled_expr) ->
@@ -95,12 +85,7 @@ let of_expression (expression : Parsetree.expression) : t =
           (paths_rev, values_rev) labeled_expr
     | Pexp_match (expr, cases) | Pexp_try (expr, cases) ->
         let paths_rev, values_rev = collect expr (paths_rev, values_rev) in
-        List.fold_left
-          (fun (paths_rev, values_rev) case ->
-            let case_bindings = Bindings.of_pattern case.pc_lhs in
-            let values_rev = add_values values_rev case_bindings in
-            collect case.pc_rhs (paths_rev, values_rev))
-          (paths_rev, values_rev) cases
+        List.fold_left collect_case (paths_rev, values_rev) cases
     | Pexp_tuple exprs | Pexp_array exprs ->
         List.fold_left
           (fun acc expr -> collect expr acc)
@@ -181,13 +166,17 @@ let of_expression (expression : Parsetree.expression) : t =
         | Some payload -> collect payload (paths_rev, values_rev)
         | None -> (
             match Platform.client_case expression with
-            | Some case ->
-                let values_rev =
-                  add_values values_rev (Bindings.of_pattern case.pc_lhs)
-                in
-                collect case.pc_rhs (paths_rev, values_rev)
+            | Some case -> collect_case (paths_rev, values_rev) case
             | None -> (paths_rev, values_rev)))
     | _ -> (paths_rev, values_rev)
+  and collect_case (paths_rev, values_rev) (case : Parsetree.case) =
+    let values_rev = add_values values_rev (Bindings.of_pattern case.pc_lhs) in
+    let paths_rev, values_rev =
+      match case.pc_guard with
+      | None -> (paths_rev, values_rev)
+      | Some guard -> collect guard (paths_rev, values_rev)
+    in
+    collect case.pc_rhs (paths_rev, values_rev)
   and collect_params params (paths_rev, values_rev) =
     List.fold_left
       (fun (paths_rev, values_rev) (p : Parsetree.function_param) ->

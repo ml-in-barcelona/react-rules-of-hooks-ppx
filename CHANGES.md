@@ -10,6 +10,10 @@
   (`input.page.size`) but not the whole record. Stable roots (setters, refs)
   keep every path under them exempt (`ref.current`). Diagnostics and
   `-corrections` output emit member paths.
+- [FIX] Identifiers in `when` guards of `match`/`try` cases inside a hook
+  callback now count as dependency uses:
+  `match v with Some x when x > limit -> ...` reports a missing `limit`.
+  Previously only `function` case guards were collected.
 - [FEAT] `[@react.async.component]` bindings are recognized as components,
   same as `[@react.component]`.
 - [FEAT] `[@react.client.component]` bindings are recognized as components,
