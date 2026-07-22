@@ -74,12 +74,12 @@ let of_expression (expression : Parsetree.expression) : t =
     | Pexp_constraint (expr, _) -> collect expr (paths_rev, values_rev)
     | Pexp_newtype (_, expr) -> collect expr (paths_rev, values_rev)
     | Pexp_apply (fn_expr, labeled_expr) ->
-        let paths_rev =
-          match fn_expr.pexp_desc with
-          | Pexp_ident { txt = Lident name as ident; _ }
-            when not (is_operator name) ->
-              path_of_ident ident :: paths_rev
-          | _ -> paths_rev
+        let paths_rev, values_rev =
+          match path_of_expression fn_expr with
+          | Some { root = Lident name; fields = [] } when is_operator name ->
+              (paths_rev, values_rev)
+          | Some path -> (path :: paths_rev, values_rev)
+          | None -> collect fn_expr (paths_rev, values_rev)
         in
         List.fold_left
           (fun (paths_rev, values_rev) (_, arg_expr) ->
