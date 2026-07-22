@@ -31,10 +31,9 @@ type kind = Component | Custom_hook | Function | Value
 
 val classify : value_binding -> kind
 (** [Component] for [@react.component], [@react.client.component] or
-    [@react.async.component] function bindings (also detected across
-    [%platform] cases), [Custom_hook] for
-    function bindings named like a hook, [Function] for other functions, [Value]
-    otherwise. *)
+    [@react.async.component] function bindings (also detected across [%platform]
+    cases), [Custom_hook] for function bindings named like a hook, [Function]
+    for other functions, [Value] otherwise. *)
 
 val initial : t
 val enter_binding : kind -> in_component_or_hook:bool -> value_binding -> t -> t

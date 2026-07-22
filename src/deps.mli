@@ -9,9 +9,9 @@
     module-qualified) identifier: [input.page.size] is root [input] with fields
     [["page"; "size"]]. Module qualification ([Module.value]) is part of the
     root, never a field step. Any expression that is not a plain field chain
-    degrades to the paths of its sub-expressions. A field assignment
-    [r.x <- e] counts as a use of the written path [r.x] (so stable roots
-    exempt writes through them) plus the uses of [e].
+    degrades to the paths of its sub-expressions. A field assignment [r.x <- e]
+    counts as a use of the written path [r.x] (so stable roots exempt writes
+    through them) plus the uses of [e].
 
     Both lists preserve source order and may contain duplicates; callers dedupe
     as needed. Operators are not collected. *)
@@ -42,8 +42,8 @@ val path_to_string : path -> string
 val is_prefix : prefix:path -> path:path -> bool
 (** [is_prefix ~prefix ~path] holds when [prefix] covers [path]: same root (by
     name) and [prefix]'s fields are a prefix of [path]'s. A declared
-    [input.page] covers a use of [input.page.size] but not [input.limit] and
-    not bare [input]. *)
+    [input.page] covers a use of [input.page.size] but not [input.limit] and not
+    bare [input]. *)
 
 val is_strict_prefix : prefix:path -> path:path -> bool
 (** Like {!is_prefix} but excluding equal paths: [input] strictly prefixes

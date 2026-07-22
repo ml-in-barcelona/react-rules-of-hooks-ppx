@@ -137,8 +137,8 @@ let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
 
 let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
     ~callback_arg ~(static_deps : StringSet.t)
-    ~(component_scope_bindings : StringSet.t)
-    ~(declared_paths : Deps.path list) ~(body_paths : Deps.path list) =
+    ~(component_scope_bindings : StringSet.t) ~(declared_paths : Deps.path list)
+    ~(body_paths : Deps.path list) =
   let uncovered_paths =
     body_paths
     |> List.filter (fun path ->

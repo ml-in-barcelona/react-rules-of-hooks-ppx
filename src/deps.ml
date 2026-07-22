@@ -64,7 +64,9 @@ let of_expression (expression : Parsetree.expression) : t =
         in
         collect expr (paths_rev, values_rev)
     | Pexp_function (params, _, body) -> (
-        let paths_rev, values_rev = collect_params params (paths_rev, values_rev) in
+        let paths_rev, values_rev =
+          collect_params params (paths_rev, values_rev)
+        in
         match body with
         | Pfunction_body body -> collect body (paths_rev, values_rev)
         | Pfunction_cases (cases, _, _) ->
@@ -147,7 +149,9 @@ let of_expression (expression : Parsetree.expression) : t =
     | Pexp_poly (expr, _) -> collect expr (paths_rev, values_rev)
     | Pexp_open (_, expr) -> collect expr (paths_rev, values_rev)
     | Pexp_letop { let_; ands; body } ->
-        let paths_rev, values_rev = collect let_.pbop_exp (paths_rev, values_rev) in
+        let paths_rev, values_rev =
+          collect let_.pbop_exp (paths_rev, values_rev)
+        in
         let binding_names = Bindings.of_pattern let_.pbop_pat in
         let paths_rev, values_rev =
           List.fold_left
