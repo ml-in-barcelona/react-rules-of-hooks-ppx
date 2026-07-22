@@ -1,29 +1,3 @@
-(** Binding-scope tracking for the analysis.
-
-    Tracks, at each point of the traversal:
-    - {b component bindings} — names bound inside the current component or
-      custom hook: the candidate dependencies;
-    - {b outer bindings} — names bound at the module level: constant between
-      renders, never valid dependencies;
-    - {b static deps} — names that are referentially stable ([Stable]) and hence
-      omittable from dependency arrays;
-    - {b stable wrappers} — locally-defined hooks that inherit a stability
-      shape;
-    - {b browser-only hooks} — names bound by [%browser_only] hook wrappers,
-      which count as hook calls for the rules of hooks.
-
-    Protocol, mirrored by the traversal in [Ppx]:
-    + [enter_binding] when a value binding is met: the bound names shadow any
-      stale stable/browser-only info, plain bindings are routed to component or
-      outer scope, and stability facts are recorded;
-    + [binding_body] before traversing the binding's body: a Component or
-      Custom_hook opens a fresh scope (its parameters become the component
-      bindings, static deps reset);
-    + [exit_binding] after the body: a Component/Custom_hook discards the scope
-      it opened (restoring the state recorded at [enter_binding]); other kinds
-      keep the traversed state. Outer bindings and browser-only hooks always
-      persist. *)
-
 open Ppxlib
 
 type t

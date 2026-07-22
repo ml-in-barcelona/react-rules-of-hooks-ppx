@@ -1,10 +1,3 @@
-(** Names introduced by patterns, parameters and bindings, and syntactic views
-    of function bodies.
-
-    Platform-aware: parameters and labels are collected across [%platform]
-    cases, and bodies are found through [%browser_only] payloads and the
-    platform [Client] branch, so callers never re-implement that rule. *)
-
 open Ppxlib
 
 val of_pattern : pattern -> string list

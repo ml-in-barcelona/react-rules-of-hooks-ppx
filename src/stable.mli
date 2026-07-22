@@ -1,14 +1,3 @@
-(** Referentially-stable values returned by hooks (see STABLE_HOOKS.md).
-
-    React guarantees stability for [useState]'s setter, [useReducer]'s dispatch
-    and the [useRef] box, so they never need to appear in a dependency array.
-    Stability propagates through local hook wrappers
-    ([let useX = ... useState ...]), and a [setX] / [dispatch...] naming
-    convention covers values returned by custom hooks.
-
-    Callers provide already-known stable wrappers through the [lookup] function;
-    scope tracking owns that table. *)
-
 open Ppxlib
 
 type shape =

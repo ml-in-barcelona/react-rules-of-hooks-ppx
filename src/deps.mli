@@ -1,21 +1,3 @@
-(** Member-path dependency extraction for exhaustive-deps.
-
-    Given a hook callback (or a dependency array), collect the dependency paths
-    it uses and the names it binds locally; the difference is what a dependency
-    array must cover. Follows only client-executed code across platform
-    constructs ([%platform] Client branch, [%browser_only] payload).
-
-    A path is a chain of record-field accesses over a (possibly
-    module-qualified) identifier: [input.page.size] is root [input] with fields
-    [["page"; "size"]]. Module qualification ([Module.value]) is part of the
-    root, never a field step. Any expression that is not a plain field chain
-    degrades to the paths of its sub-expressions. A field assignment [r.x <- e]
-    counts as a use of the written path [r.x] (so stable roots exempt writes
-    through them) plus the uses of [e].
-
-    Both lists preserve source order and may contain duplicates; callers dedupe
-    as needed. Operators are not collected. *)
-
 open Ppxlib
 
 type path = { root : Longident.t; fields : string list }

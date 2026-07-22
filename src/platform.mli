@@ -1,11 +1,3 @@
-(** server-reason-react platform constructs.
-
-    The analysis follows only the code that executes in the browser: the
-    [Client] branch of a [%platform match ...] switch and the payload of
-    [%browser_only ...]. Every rule about "looking through" these constructs
-    lives here — callers never pattern-match the extension payloads themselves.
-*)
-
 open Ppxlib
 
 val match_payload : expression -> (expression * case list) option
