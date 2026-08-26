@@ -85,20 +85,6 @@ let make = (~condition) => {
 Error: Hooks can't be called conditionally and must be called at the top-level of your component. Move this hook call outside of conditionals, loops, or nested functions.
 ```
 
-## Platform branches (server-reason-react)
-
-[server-reason-react](https://github.com/ml-in-barcelona/server-reason-react)'s
-`switch%platform` and `let%browser_only` / `[%browser_only ...]` are resolved
-at compile time, one branch per build target, so the ppx does not treat them
-as runtime conditionals:
-
-- Hooks may be called in `| Server` and `| Client` branches. Real runtime
-  conditionals nested inside a branch (or wrapping the switch) still error.
-- `let%browser_only` functions that call hooks count as custom hooks
-  whatever their name, and calls to them are linted like hook calls.
-- Exhaustive-deps reads only the `Client` branch, where dependency arrays
-  matter.
-
 ## Install
 
 ```bash
