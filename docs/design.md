@@ -119,7 +119,10 @@ into:
   an error: the callback runs at effect time, not render time)
 
 A hook call in a conditional context, or inside JSX (an element body only
-renders when the element does), produces:
+renders when the element does), produces the error below. Each visited
+expression restores the context it entered with, so a JSX element does not
+mark the expressions after it: in `ignore <div />; useState ...` the hook is
+at the top level.
 
 ```
 Hooks can't be called conditionally and must be called at the top level of

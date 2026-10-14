@@ -11,6 +11,8 @@ val last_component : Longident.t -> string option
 val is_hook_ident : Longident.t -> bool
 (** [is_hook_name] on the last component of the path. *)
 
+val has_attribute : string -> attributes -> bool
+
 val is_jsx : attributes -> bool
 (** JSX elements carry a [@JSX] attribute; they are function applications
     syntactically but are never hook calls. *)
@@ -35,10 +37,22 @@ module With_deps : sig
   type t = { prefix : string; base : string; variant : int option }
 
   val decode : string -> t option
-  val takes_deps : string -> bool
 
   val with_variant : t -> int -> string
   (** [with_variant d n] renders [d]'s full name with arity variant [n], e.g.
       [with_variant { prefix = "React."; base = "useEffect"; _ } 2] is
       ["React.useEffect2"]. *)
+
+  type call = {
+    name : string;
+    info : t;
+    fn_loc : Location.t;
+    callback_arg : (arg_label * expression) option;
+    deps_arg : (arg_label * expression) option;
+  }
+
+  val call : expression -> call option
+  (** A function application whose callee is a deps-taking hook, JSX not
+      excluded. [callback_arg] and [deps_arg] are the first and second
+      arguments. *)
 end

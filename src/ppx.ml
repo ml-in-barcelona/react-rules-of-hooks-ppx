@@ -7,6 +7,8 @@ module LocationSet = Set.Make (struct
   let compare = Stdlib.compare
 end)
 
+let disable_order_of_hooks_attribute = "disable_order_of_hooks"
+let disable_exhaustive_deps_attribute = "disable_exhaustive_deps"
 let disable_exhaustive_deps_flag = ref false
 let disable_order_of_hooks_flag = ref false
 let enable_corrections_flag = ref false
@@ -32,15 +34,18 @@ let make_error_stri ~loc msg =
     (Location.error_extensionf ~loc "%s" msg)
     []
 
-let unique_strings list =
+let unique (type a) (module Set : Set.S with type elt = a) (list : a list) =
   let _, acc_rev =
     List.fold_left
       (fun (seen, acc_rev) item ->
-        if StringSet.mem item seen then (seen, acc_rev)
-        else (StringSet.add item seen, item :: acc_rev))
-      (StringSet.empty, []) list
+        if Set.mem item seen then (seen, acc_rev)
+        else (Set.add item seen, item :: acc_rev))
+      (Set.empty, []) list
   in
   List.rev acc_rev
+
+let unique_strings = unique (module StringSet)
+let unique_locations = unique (module LocationSet)
 
 let find_duplicates list =
   let rec go seen dups = function
@@ -50,16 +55,6 @@ let find_duplicates list =
         else go (StringSet.add x seen) dups xs
   in
   go StringSet.empty StringSet.empty list
-
-let unique_locations list =
-  let _, acc_rev =
-    List.fold_left
-      (fun (seen, acc_rev) item ->
-        if LocationSet.mem item seen then (seen, acc_rev)
-        else (LocationSet.add item seen, item :: acc_rev))
-      (LocationSet.empty, []) list
-  in
-  List.rev acc_rev
 
 let quotes = Printf.sprintf "'%s'"
 let quoted_list list = list |> List.map quotes |> String.concat ", "
@@ -84,8 +79,8 @@ let format_deps (deps : string list) : string =
   | [ dep ] -> "[| " ^ dep ^ " |]"
   | _ -> "(" ^ String.concat ", " deps ^ ")"
 
-let has_attribute name attrs =
-  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = name)
+let dependency_noun list =
+  if List.length list = 1 then "dependency" else "dependencies"
 
 let check_duplicate_deps ~is_reason ~deps_loc (declared_paths : Deps.path list)
     =
@@ -97,60 +92,56 @@ let check_duplicate_deps ~is_reason ~deps_loc (declared_paths : Deps.path list)
     let msg =
       Printf.sprintf
         "exhaustive-deps: Duplicate %s %s in the dependency array.\n%s"
-        (if List.length duplicate_deps = 1 then "dependency" else "dependencies")
+        (dependency_noun duplicate_deps)
         (quoted_list duplicate_deps)
         (suppress_exhaustive_deps_hint ~is_reason)
     in
     [ Driver.Lint_error.of_string deps_loc msg ]
 
-let register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc ~deps_arg
-    ~callback_arg ~all_deps ~total_dep_count =
-  let hook_info = Hook.With_deps.decode name in
+let register_missing_deps_correction ~hook_info ~fn_loc ~expr_loc ~deps_loc
+    ~deps_arg ~callback_arg ~all_deps ~total_dep_count =
   let needs_rename (info : Hook.With_deps.t) =
     match info.variant with None -> true | Some n -> n <> total_dep_count
   in
-  let register_hook_rename ~loc hook_info =
-    match hook_info with
-    | Some info when needs_rename info ->
-        let new_name = Hook.With_deps.with_variant info total_dep_count in
-        Driver.register_correction ~loc ~repl:new_name
-    | Some _ | None -> ()
-  in
-  match deps_arg with
-  | None -> (
-      match (hook_info, callback_arg) with
-      | Some info, Some (_, callback_expr) when needs_rename info ->
-          let callback_str =
-            Format.asprintf "%a" Pprintast.expression callback_expr
-          in
-          let new_name = Hook.With_deps.with_variant info total_dep_count in
-          let corrected_deps = format_deps all_deps in
-          let full_correction =
-            Printf.sprintf "%s (%s) %s" new_name callback_str corrected_deps
-          in
-          Driver.register_correction ~loc:expr_loc ~repl:full_correction
-      | _ -> ())
-  | Some _ ->
-      let corrected_deps = format_deps all_deps in
+  let renamed_hook = Hook.With_deps.with_variant hook_info total_dep_count in
+  let corrected_deps = format_deps all_deps in
+  match (deps_arg, callback_arg) with
+  | None, Some (_, callback_expr) when needs_rename hook_info ->
+      let callback_str =
+        Format.asprintf "%a" Pprintast.expression callback_expr
+      in
+      let full_correction =
+        Printf.sprintf "%s (%s) %s" renamed_hook callback_str corrected_deps
+      in
+      Driver.register_correction ~loc:expr_loc ~repl:full_correction
+  | None, _ -> ()
+  | Some _, _ ->
       Driver.register_correction ~loc:deps_loc ~repl:corrected_deps;
-      register_hook_rename ~loc:fn_loc hook_info
+      if needs_rename hook_info then
+        Driver.register_correction ~loc:fn_loc ~repl:renamed_hook
 
-let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
-    ~callback_arg ~(static_deps : StringSet.t)
+let check_missing_deps ~is_reason ~deps_loc ~hook_info ~fn_loc ~expr_loc
+    ~deps_arg ~callback_arg ~(static_deps : StringSet.t)
     ~(component_scope_bindings : StringSet.t) ~(declared_paths : Deps.path list)
     ~(body_paths : Deps.path list) =
+  let is_required_dependency path =
+    let root = Deps.root_name path in
+    let is_component_value =
+      StringSet.mem root component_scope_bindings
+      && not (Deps.is_qualified path)
+    in
+    let is_stable = StringSet.mem root static_deps in
+    is_component_value && not is_stable
+  in
+  let is_declared path =
+    List.exists
+      (fun declared -> Deps.is_prefix ~prefix:declared ~path)
+      declared_paths
+  in
   let uncovered_paths =
     body_paths
-    |> List.filter (fun path ->
-        let root = Deps.root_name path in
-        StringSet.mem root component_scope_bindings
-        && (not (Deps.is_qualified path))
-        && not (StringSet.mem root static_deps))
-    |> List.filter (fun path ->
-        not
-          (List.exists
-             (fun declared -> Deps.is_prefix ~prefix:declared ~path)
-             declared_paths))
+    |> List.filter is_required_dependency
+    |> List.filter (fun path -> not (is_declared path))
   in
   let missing =
     (* When both a path and one of its prefixes are missing, the prefix covers
@@ -168,13 +159,12 @@ let check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc ~deps_arg
     let all_deps = unique_path_strings declared_paths @ missing in
     let total_dep_count = List.length all_deps in
     if !enable_corrections_flag then
-      register_missing_deps_correction ~name ~fn_loc ~expr_loc ~deps_loc
+      register_missing_deps_correction ~hook_info ~fn_loc ~expr_loc ~deps_loc
         ~deps_arg ~callback_arg ~all_deps ~total_dep_count;
     let msg =
       Printf.sprintf
         "exhaustive-deps: Missing %s %s from the dependency array.\n%s"
-        (if List.length missing = 1 then "dependency" else "dependencies")
-        (quoted_list missing)
+        (dependency_noun missing) (quoted_list missing)
         (suppress_exhaustive_deps_hint ~is_reason)
     in
     [ Driver.Lint_error.of_string deps_loc msg ]
@@ -261,9 +251,12 @@ let no_deps_memo_error ~name ~loc : Driver.Lint_error.t list =
 
 let check_hook_deps_exhaustiveness (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
-    ~(component_scope_bindings : StringSet.t) ~name ~fn_loc ~deps_arg ~args
+    ~(component_scope_bindings : StringSet.t) (call : Hook.With_deps.call)
     (e : Parsetree.expression) : Driver.Lint_error.t list =
-  let callback_arg = List.nth_opt args 0 in
+  let { Hook.With_deps.name; info = hook_info; fn_loc; callback_arg; deps_arg }
+      =
+    call
+  in
   let body_deps =
     (match callback_arg with
       | Some (_, fn_expr) -> Bindings.function_body fn_expr
@@ -289,9 +282,9 @@ let check_hook_deps_exhaustiveness (ctx : Expansion_context.Base.t)
   in
   let is_reason = is_reason_file ctx in
   check_duplicate_deps ~is_reason ~deps_loc declared_paths
-  @ check_missing_deps ~is_reason ~deps_loc ~name ~fn_loc ~expr_loc:e.pexp_loc
-      ~deps_arg ~callback_arg ~static_deps ~component_scope_bindings
-      ~declared_paths ~body_paths
+  @ check_missing_deps ~is_reason ~deps_loc ~hook_info ~fn_loc
+      ~expr_loc:e.pexp_loc ~deps_arg ~callback_arg ~static_deps
+      ~component_scope_bindings ~declared_paths ~body_paths
   @ check_outer_scope_deps ~is_reason ~deps_loc ~name ~outer_scope_bindings
       ~declared_paths
 
@@ -299,43 +292,36 @@ let check_hook_deps (ctx : Expansion_context.Base.t)
     ~(static_deps : StringSet.t) ~(outer_scope_bindings : StringSet.t)
     ~(component_scope_bindings : StringSet.t) (e : Parsetree.expression) :
     Driver.Lint_error.t list =
-  match e.pexp_desc with
-  | Pexp_apply
-      ( { pexp_desc = Pexp_ident { txt = lident; _ }; pexp_loc = fn_loc; _ },
-        args ) -> (
-      let name = Longident.name lident in
-      if not (Hook.With_deps.takes_deps name) then []
+  match Hook.With_deps.call e with
+  | None -> []
+  | Some call -> (
+      let disabled_on_call =
+        Hook.has_attribute disable_exhaustive_deps_attribute e.pexp_attributes
+      in
+      let disabled_on_deps_arg =
+        match call.deps_arg with
+        | Some (_, deps_expr) ->
+            Hook.has_attribute disable_exhaustive_deps_attribute
+              deps_expr.pexp_attributes
+        | None -> false
+      in
+      let deps_check_disabled = disabled_on_call || disabled_on_deps_arg in
+      if deps_check_disabled then []
       else
-        let deps_arg = List.nth_opt args 1 in
-        let is_disabled =
-          has_attribute "disable_exhaustive_deps" e.pexp_attributes
-          || Option.map
-               (fun (_, deps_expr) ->
-                 has_attribute "disable_exhaustive_deps"
-                   deps_expr.pexp_attributes)
-               deps_arg
-             |> Option.value ~default:false
-        in
-        if is_disabled then []
-        else
-          match (deps_arg, Hook.With_deps.decode name) with
-          | ( None,
-              Some
-                {
-                  base = "useEffect" | "useLayoutEffect" | "useInsertionEffect";
-                  variant = None;
-                  _;
-                } ) ->
-              check_no_deps_effect ~static_deps ~name ~loc:e.pexp_loc
-                (List.nth_opt args 0)
-          | None, Some { base = "useMemo" | "useCallback"; variant = None; _ }
-            ->
-              no_deps_memo_error ~name ~loc:e.pexp_loc
-          | _ ->
-              check_hook_deps_exhaustiveness ctx ~static_deps
-                ~outer_scope_bindings ~component_scope_bindings ~name ~fn_loc
-                ~deps_arg ~args e)
-  | _ -> []
+        match (call.deps_arg, call.info) with
+        | ( None,
+            {
+              base = "useEffect" | "useLayoutEffect" | "useInsertionEffect";
+              variant = None;
+              _;
+            } ) ->
+            check_no_deps_effect ~static_deps ~name:call.name ~loc:e.pexp_loc
+              call.callback_arg
+        | None, { base = "useMemo" | "useCallback"; variant = None; _ } ->
+            no_deps_memo_error ~name:call.name ~loc:e.pexp_loc
+        | _ ->
+            check_hook_deps_exhaustiveness ctx ~static_deps
+              ~outer_scope_bindings ~component_scope_bindings call e)
 
 type hook_context = {
   is_inside_component : bool;
@@ -398,6 +384,9 @@ let binding_body_context (kind : Scope.kind) context =
       }
   | Value -> context
 
+let is_inside_component_or_hook context =
+  context.is_inside_component || context.is_inside_custom_hook
+
 let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
     ~check_order_of_hooks =
   object (self)
@@ -407,18 +396,22 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       self#binding_with_kind (Scope.classify t) t state
 
     method private browser_only_binding vb state =
-      if
+      let wraps_hook_in_function =
         Scope.is_browser_only_hook_wrapper vb
         && Option.is_some (Bindings.function_body vb.pvb_expr)
-      then self#binding_with_kind Scope.Custom_hook vb state
+      in
+      if wraps_hook_in_function then
+        self#binding_with_kind Scope.Custom_hook vb state
       else self#value_binding vb state
 
     method private binding_with_kind kind t state =
-      let in_component_or_hook =
-        state.context.is_inside_component || state.context.is_inside_custom_hook
-      in
       let entered =
-        Scope.enter_binding kind ~in_component_or_hook t state.scope
+        Scope.enter_binding kind
+          ~in_component_or_hook:(is_inside_component_or_hook state.context)
+          t state.scope
+      in
+      let disabled_for_binding ~attribute ~inherited =
+        inherited || Hook.has_attribute attribute t.pvb_attributes
       in
       let body_state =
         {
@@ -427,11 +420,12 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
             {
               (binding_body_context kind state.context) with
               is_order_of_hooks_disabled =
-                state.context.is_order_of_hooks_disabled
-                || has_attribute "disable_order_of_hooks" t.pvb_attributes;
+                disabled_for_binding ~attribute:disable_order_of_hooks_attribute
+                  ~inherited:state.context.is_order_of_hooks_disabled;
               is_exhaustive_deps_disabled =
-                state.context.is_exhaustive_deps_disabled
-                || has_attribute "disable_exhaustive_deps" t.pvb_attributes;
+                disabled_for_binding
+                  ~attribute:disable_exhaustive_deps_attribute
+                  ~inherited:state.context.is_exhaustive_deps_disabled;
             };
           scope = Scope.binding_body kind t entered;
         }
@@ -458,7 +452,8 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       | None -> super#structure_item t state
 
     method private collect_exhaustive_deps_errors ~is_disabled expr state =
-      if (not check_exhaustive) || is_disabled then state
+      let deps_check_skipped = (not check_exhaustive) || is_disabled in
+      if deps_check_skipped then state
       else
         match
           check_hook_deps ctx
@@ -476,14 +471,20 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
 
     method private collect_hook_order_errors ~is_disabled ~is_conditional_or_jsx
         ~is_outside_component_or_hook (expr : Parsetree.expression) state =
-      if (not check_order_of_hooks) || is_disabled then state
+      let order_check_skipped = (not check_order_of_hooks) || is_disabled in
+      if order_check_skipped then state
       else
         match Hook.call_ident expr with
-        | Some lident
-          when Hook.is_hook_ident lident
-               || Scope.is_tracked_browser_only_hook state.scope lident ->
-            if has_attribute "disable_order_of_hooks" expr.pexp_attributes then
-              state
+        | Some lident ->
+            let is_hook_call =
+              Hook.is_hook_ident lident
+              || Scope.is_tracked_browser_only_hook state.scope lident
+            in
+            let opted_out =
+              Hook.has_attribute disable_order_of_hooks_attribute
+                expr.pexp_attributes
+            in
+            if (not is_hook_call) || opted_out then state
             else
               let state =
                 if is_conditional_or_jsx then
@@ -501,7 +502,7 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                     expr.pexp_loc :: state.outside_locations_rev;
                 }
               else state
-        | _ -> state
+        | None -> state
 
     method! expression t state =
       let state =
@@ -522,6 +523,9 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
           context = { state.context with is_inside_conditional = true };
         }
       in
+      let visit_conditionally expr state =
+        self#expression expr (mark_conditional state)
+      in
       let restore_context original_ctx state =
         { state with context = original_ctx }
       in
@@ -529,12 +533,9 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
         match (Platform.match_payload t, Platform.browser_only_payload t) with
         | Some (scrut, cases), _ ->
             let state = self#expression scrut state in
-            let state =
-              List.fold_left
-                (fun state case -> self#expression case.pc_rhs state)
-                state cases
-            in
-            restore_context hook_context state
+            List.fold_left
+              (fun state case -> self#expression case.pc_rhs state)
+              state cases
         | None, Some payload -> (
             match payload.pexp_desc with
             | Pexp_let (_, vbs, body) ->
@@ -553,75 +554,47 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                   }
                 in
                 let state = self#expression body state in
-                let state =
-                  {
-                    state with
-                    scope =
-                      Scope.restore_browser_only saved_browser_only state.scope;
-                  }
-                in
-                restore_context hook_context state
-            | _ ->
-                let state = self#expression payload state in
-                restore_context hook_context state)
+                {
+                  state with
+                  scope =
+                    Scope.restore_browser_only saved_browser_only state.scope;
+                }
+            | _ -> self#expression payload state)
         | None, None -> (
             match t.pexp_desc with
             | Pexp_match (expr, cases) ->
                 let state = self#expression expr state in
-                let state =
-                  List.fold_left
-                    (fun state case ->
-                      self#expression case.pc_rhs (mark_conditional state))
-                    state cases
-                in
-                restore_context hook_context state
+                List.fold_left
+                  (fun state case -> visit_conditionally case.pc_rhs state)
+                  state cases
             | Pexp_try (expr, cases) ->
-                let state = self#expression expr (mark_conditional state) in
-                let state =
-                  List.fold_left
-                    (fun state case ->
-                      self#expression case.pc_rhs (mark_conditional state))
-                    state cases
-                in
-                restore_context hook_context state
+                let state = visit_conditionally expr state in
+                List.fold_left
+                  (fun state case -> visit_conditionally case.pc_rhs state)
+                  state cases
             | Pexp_while (cond, expr) ->
                 let state = self#expression cond state in
-                let state = self#expression expr (mark_conditional state) in
-                restore_context hook_context state
+                visit_conditionally expr state
             | Pexp_for (_, start_expr, end_expr, _, body) ->
                 let state = self#expression start_expr state in
                 let state = self#expression end_expr state in
-                let state = self#expression body (mark_conditional state) in
-                restore_context hook_context state
-            | Pexp_ifthenelse (if_expr, then_expr, else_expr) ->
+                visit_conditionally body state
+            | Pexp_ifthenelse (if_expr, then_expr, else_expr) -> (
                 let state = self#expression if_expr state in
-                let state =
-                  self#expression then_expr (mark_conditional state)
-                in
-                let state =
-                  match else_expr with
-                  | Some expr -> self#expression expr (mark_conditional state)
-                  | None -> state
-                in
-                restore_context hook_context state
-            | Pexp_lazy expr ->
-                let state = self#expression expr (mark_conditional state) in
-                restore_context hook_context state
-            | Pexp_assert expr ->
-                let state = self#expression expr (mark_conditional state) in
-                restore_context hook_context state
+                let state = visit_conditionally then_expr state in
+                match else_expr with
+                | Some expr -> visit_conditionally expr state
+                | None -> state)
+            | Pexp_lazy expr | Pexp_assert expr ->
+                visit_conditionally expr state
             | Pexp_apply
                 ( { pexp_desc = Pexp_ident { txt = Lident ("&&" | "||"); _ }; _ },
                   args ) ->
-                let state =
-                  List.fold_left
-                    (fun state (_, arg_expr) ->
-                      self#expression arg_expr (mark_conditional state))
-                    state args
-                in
-                restore_context hook_context state
+                List.fold_left
+                  (fun state (_, arg_expr) ->
+                    visit_conditionally arg_expr state)
+                  state args
             | Pexp_function (params, _, func_body) ->
-                let saved_jsx_context = hook_context.is_inside_jsx in
                 let state =
                   List.fold_left
                     (fun state (p : Parsetree.function_param) ->
@@ -640,47 +613,46 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
                   {
                     state with
                     context =
-                      { state.context with is_inside_jsx = saved_jsx_context };
+                      {
+                        state.context with
+                        is_inside_jsx = hook_context.is_inside_jsx;
+                      };
                   }
                 in
-                let state =
-                  match func_body with
-                  | Pfunction_body body -> self#expression body state_for_body
-                  | Pfunction_cases (cases, _, _) ->
-                      List.fold_left
-                        (fun state case -> self#case case state)
-                        state_for_body cases
-                in
-                restore_context hook_context state
-            | Pexp_apply
-                ({ pexp_desc = Pexp_ident { txt = lident; _ }; _ }, args)
-              when Hook.With_deps.takes_deps (Longident.name lident) ->
-                let callback_arg = List.nth_opt args 0 in
-                let deps_arg = List.nth_opt args 1 in
-                let state =
-                  match callback_arg with
-                  | Some (_, callback_expr) ->
-                      self#expression callback_expr (mark_conditional state)
-                  | None -> state
-                in
-                let state =
-                  match deps_arg with
-                  | Some (_, deps_expr) -> self#expression deps_expr state
-                  | None -> state
-                in
-                restore_context hook_context state
-            | _ -> super#expression t state)
+                begin match func_body with
+                | Pfunction_body body -> self#expression body state_for_body
+                | Pfunction_cases (cases, _, _) ->
+                    List.fold_left
+                      (fun state case -> self#case case state)
+                      state_for_body cases
+                end
+            | _ -> (
+                match Hook.With_deps.call t with
+                | Some { callback_arg; deps_arg; _ } ->
+                    let state =
+                      match callback_arg with
+                      | Some (_, callback_expr) ->
+                          visit_conditionally callback_expr state
+                      | None -> state
+                    in
+                    begin match deps_arg with
+                    | Some (_, deps_expr) -> self#expression deps_expr state
+                    | None -> state
+                    end
+                | None -> super#expression t state))
+      in
+      let is_conditional_or_jsx =
+        hook_context.is_inside_conditional || hook_context.is_inside_jsx
       in
       state
+      |> restore_context hook_context
       |> self#collect_exhaustive_deps_errors
            ~is_disabled:hook_context.is_exhaustive_deps_disabled t
       |> self#collect_hook_order_errors
            ~is_disabled:hook_context.is_order_of_hooks_disabled
-           ~is_conditional_or_jsx:
-             (hook_context.is_inside_conditional || hook_context.is_inside_jsx)
+           ~is_conditional_or_jsx
            ~is_outside_component_or_hook:
-             ((not hook_context.is_inside_component)
-             && not hook_context.is_inside_custom_hook)
+             (not (is_inside_component_or_hook hook_context))
            t
   end
 

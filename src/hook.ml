@@ -21,8 +21,10 @@ let is_hook_ident longident =
   | Some name -> is_hook_name name
   | None -> false
 
-let is_jsx (attrs : attributes) =
-  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = "JSX")
+let has_attribute name (attrs : attributes) =
+  attrs |> List.exists (fun { attr_name; _ } -> attr_name.txt = name)
+
+let is_jsx = has_attribute "JSX"
 
 let call_ident (expr : Parsetree.expression) : Longident.t option =
   match expr.pexp_desc with
@@ -48,17 +50,17 @@ let hook_scanner =
       | None -> super#expression e
   end
 
-let expression_has_hook_calls (expr : Parsetree.expression) : bool =
+let contains_hook_call scan =
   try
-    hook_scanner#expression expr;
+    scan hook_scanner;
     false
   with Hook_found -> true
 
-let structure_has_hook_calls (structure : Parsetree.structure) : bool =
-  try
-    hook_scanner#structure structure;
-    false
-  with Hook_found -> true
+let expression_has_hook_calls expr =
+  contains_hook_call (fun scanner -> scanner#expression expr)
+
+let structure_has_hook_calls structure =
+  contains_hook_call (fun scanner -> scanner#structure structure)
 
 module With_deps = struct
   type t = { prefix : string; base : string; variant : int option }
@@ -93,6 +95,29 @@ module With_deps = struct
       (fun base -> List.find_map (fun prefix -> try_parse prefix base) prefixes)
       bases
 
-  let takes_deps name = Option.is_some (decode name)
   let with_variant t variant = t.prefix ^ t.base ^ string_of_int variant
+
+  type call = {
+    name : string;
+    info : t;
+    fn_loc : Location.t;
+    callback_arg : (arg_label * Parsetree.expression) option;
+    deps_arg : (arg_label * Parsetree.expression) option;
+  }
+
+  let call (expr : Parsetree.expression) : call option =
+    match expr.pexp_desc with
+    | Pexp_apply
+        ({ pexp_desc = Pexp_ident { txt; _ }; pexp_loc = fn_loc; _ }, args) ->
+        let name = Longident.name txt in
+        decode name
+        |> Option.map (fun info ->
+            {
+              name;
+              info;
+              fn_loc;
+              callback_arg = List.nth_opt args 0;
+              deps_arg = List.nth_opt args 1;
+            })
+    | _ -> None
 end

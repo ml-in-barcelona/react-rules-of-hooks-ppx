@@ -6,23 +6,21 @@ let rec of_pattern (pattern : Parsetree.pattern) : string list =
   | Ppat_tuple patterns -> List.concat_map of_pattern patterns
   | Ppat_record (fields, _) ->
       List.concat_map (fun (_, pat) -> of_pattern pat) fields
-  | Ppat_construct (_, Some (_, pat)) -> of_pattern pat
-  | Ppat_variant (_, Some pat) -> of_pattern pat
+  | Ppat_construct (_, Some (_, pat))
+  | Ppat_variant (_, Some pat)
+  | Ppat_constraint (pat, _)
+  | Ppat_lazy pat
+  | Ppat_open (_, pat)
+  | Ppat_exception pat ->
+      of_pattern pat
   | Ppat_or (p1, p2) -> of_pattern p1 @ of_pattern p2
-  | Ppat_constraint (pat, _) -> of_pattern pat
   | Ppat_alias (pat, { txt; _ }) -> txt :: of_pattern pat
   | Ppat_array patterns -> List.concat_map of_pattern patterns
-  | Ppat_lazy pat -> of_pattern pat
-  | Ppat_open (_, pat) -> of_pattern pat
-  | Ppat_exception pat -> of_pattern pat
-  | Ppat_any -> []
-  | Ppat_constant _ -> []
-  | Ppat_interval _ -> []
-  | Ppat_construct (_, None) -> []
-  | Ppat_variant (_, None) -> []
-  | Ppat_type _ -> []
-  | Ppat_unpack _ -> []
-  | Ppat_extension _ -> []
+  | Ppat_any | Ppat_constant _ | Ppat_interval _
+  | Ppat_construct (_, None)
+  | Ppat_variant (_, None)
+  | Ppat_type _ | Ppat_unpack _ | Ppat_extension _ ->
+      []
 
 let of_params (params : Parsetree.function_param list) : string list =
   List.concat_map
@@ -31,6 +29,12 @@ let of_params (params : Parsetree.function_param list) : string list =
       | Pparam_val (_, _, pat) -> of_pattern pat
       | Pparam_newtype _ -> [])
     params
+
+let concat_map_platform_cases f (expr : Parsetree.expression) =
+  match Platform.match_payload expr with
+  | Some (_, cases) ->
+      List.concat_map (fun (case : Parsetree.case) -> f case.pc_rhs) cases
+  | None -> []
 
 let rec function_params (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
@@ -41,15 +45,8 @@ let rec function_params (expr : Parsetree.expression) : string list =
         List.concat_map (fun case -> of_pattern case.pc_lhs) cases
       in
       of_params params @ case_params
-  | Pexp_constraint (e, _) -> function_params e
-  | Pexp_newtype (_, e) -> function_params e
-  | _ -> (
-      match Platform.match_payload expr with
-      | Some (_, cases) ->
-          List.concat_map
-            (fun (case : Parsetree.case) -> function_params case.pc_rhs)
-            cases
-      | None -> [])
+  | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> function_params e
+  | _ -> concat_map_platform_cases function_params expr
 
 let rec label_names (expr : Parsetree.expression) : string list =
   match expr.pexp_desc with
@@ -63,13 +60,7 @@ let rec label_names (expr : Parsetree.expression) : string list =
           | _ -> None)
         params
   | Pexp_constraint (e, _) | Pexp_newtype (_, e) -> label_names e
-  | _ -> (
-      match Platform.match_payload expr with
-      | Some (_, cases) ->
-          List.concat_map
-            (fun (case : Parsetree.case) -> label_names case.pc_rhs)
-            cases
-      | None -> [])
+  | _ -> concat_map_platform_cases label_names expr
 
 let rec function_body (expr : Parsetree.expression) :
     Parsetree.expression option =
