@@ -36,7 +36,7 @@ wrote.
 | `-disable-exhaustive-deps` | turns off all exhaustive-deps checks |
 | `-disable-order-of-hooks` | turns off rules-of-hooks checks (scope tracking still runs, so exhaustive-deps is unaffected) |
 | `-corrections` | writes `.ppx-corrected` files with suggested dependency arrays |
-| `[@disable_exhaustive_deps]` | on a hook call or its deps argument: skips deps checks for that call |
+| `[@disable_exhaustive_deps]` | on a hook call or its deps argument: skips deps checks for that call; on a `let` binding: skips deps checks for every hook call in it |
 | `[@disable_order_of_hooks]` | on a hook call: skips order checks for that call; on a `let` binding: skips order checks for every hook call in it |
 | `REACT_HOOKS_PPX_TIMING=1` | prints per-file analysis timing to stderr |
 

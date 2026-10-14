@@ -343,6 +343,7 @@ type hook_context = {
   is_inside_conditional : bool;
   is_inside_jsx : bool;
   is_order_of_hooks_disabled : bool;
+  is_exhaustive_deps_disabled : bool;
 }
 
 type analysis_state = {
@@ -373,6 +374,7 @@ let initial_state =
         is_inside_conditional = false;
         is_inside_jsx = false;
         is_order_of_hooks_disabled = false;
+        is_exhaustive_deps_disabled = false;
       };
     scope = Scope.initial;
     lint_errors_rev = [];
@@ -427,6 +429,9 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
               is_order_of_hooks_disabled =
                 state.context.is_order_of_hooks_disabled
                 || has_attribute "disable_order_of_hooks" t.pvb_attributes;
+              is_exhaustive_deps_disabled =
+                state.context.is_exhaustive_deps_disabled
+                || has_attribute "disable_exhaustive_deps" t.pvb_attributes;
             };
           scope = Scope.binding_body kind t entered;
         }
@@ -452,8 +457,8 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
           }
       | None -> super#structure_item t state
 
-    method private collect_exhaustive_deps_errors expr state =
-      if not check_exhaustive then state
+    method private collect_exhaustive_deps_errors ~is_disabled expr state =
+      if (not check_exhaustive) || is_disabled then state
       else
         match
           check_hook_deps ctx
@@ -667,7 +672,8 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
             | _ -> super#expression t state)
       in
       state
-      |> self#collect_exhaustive_deps_errors t
+      |> self#collect_exhaustive_deps_errors
+           ~is_disabled:hook_context.is_exhaustive_deps_disabled t
       |> self#collect_hook_order_errors
            ~is_disabled:hook_context.is_order_of_hooks_disabled
            ~is_conditional_or_jsx:
