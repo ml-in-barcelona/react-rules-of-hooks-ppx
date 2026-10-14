@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+- [FEAT] `[@disable_order_of_hooks]` on a `let` binding (`let[@disable_order_of_hooks] x = ...`) skips order checks for every hook call in that binding.
+
 ## 1.3.0
 
 ### Exhaustive dependencies

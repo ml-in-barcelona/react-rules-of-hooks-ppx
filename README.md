@@ -112,6 +112,13 @@ if (condition) {
 In OCaml syntax the attribute goes after the expression:
 `(useMyHook ())[@disable_order_of_hooks]`.
 
+To skip order checks for every hook call in a `let` binding, put the
+attribute on the binding:
+
+```ocaml
+let[@disable_order_of_hooks] show, setShow = React.useState (fun () -> "") in
+```
+
 `[@disable_order_of_hooks]` remains the escape hatch for genuinely
 conditional hooks.
 

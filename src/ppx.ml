@@ -342,6 +342,7 @@ type hook_context = {
   is_inside_custom_hook : bool;
   is_inside_conditional : bool;
   is_inside_jsx : bool;
+  is_order_of_hooks_disabled : bool;
 }
 
 type analysis_state = {
@@ -371,6 +372,7 @@ let initial_state =
         is_inside_custom_hook = false;
         is_inside_conditional = false;
         is_inside_jsx = false;
+        is_order_of_hooks_disabled = false;
       };
     scope = Scope.initial;
     lint_errors_rev = [];
@@ -419,7 +421,13 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       let body_state =
         {
           state with
-          context = binding_body_context kind state.context;
+          context =
+            {
+              (binding_body_context kind state.context) with
+              is_order_of_hooks_disabled =
+                state.context.is_order_of_hooks_disabled
+                || has_attribute "disable_order_of_hooks" t.pvb_attributes;
+            };
           scope = Scope.binding_body kind t entered;
         }
       in
@@ -461,9 +469,9 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
               lint_errors_rev = List.rev_append errors state.lint_errors_rev;
             }
 
-    method private collect_hook_order_errors ~is_conditional_or_jsx
+    method private collect_hook_order_errors ~is_disabled ~is_conditional_or_jsx
         ~is_outside_component_or_hook (expr : Parsetree.expression) state =
-      if not check_order_of_hooks then state
+      if (not check_order_of_hooks) || is_disabled then state
       else
         match Hook.call_ident expr with
         | Some lident
@@ -661,6 +669,7 @@ let make_linter ~(ctx : Expansion_context.Base.t) ~check_exhaustive
       state
       |> self#collect_exhaustive_deps_errors t
       |> self#collect_hook_order_errors
+           ~is_disabled:hook_context.is_order_of_hooks_disabled
            ~is_conditional_or_jsx:
              (hook_context.is_inside_conditional || hook_context.is_inside_jsx)
            ~is_outside_component_or_hook:
