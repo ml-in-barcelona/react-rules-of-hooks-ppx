@@ -154,3 +154,24 @@ Test that the binding attribute does not leak to the next binding:
                                                            ] in
     let () = if randomProp = "other" then useMouseHook () in div[@@react.component
                                                                   ]
+
+Test that the attribute on both the binding and the hook call is accepted without a warning:
+
+  $ cat > input9.mlx << 'EOF'
+  > let useMouseHook () = ()
+  > 
+  > let[@react.component] make ~randomProp =
+  >   let[@disable_order_of_hooks] () = if randomProp = "state" then (useMouseHook ())[@disable_order_of_hooks] in
+  >   div
+  > EOF
+
+  $ mlx-pp -print-ml input9.mlx > input9.ml
+
+  $ ../src/standalone.exe input9.ml
+  let useMouseHook () = ()
+  let make ~randomProp =
+    let () =
+      if randomProp = "state"
+      then ((useMouseHook ())[@disable_order_of_hooks ])[@@disable_order_of_hooks
+                                                          ] in
+    div[@@react.component ]
