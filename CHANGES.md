@@ -1,5 +1,10 @@
 # Changes
 
+## Unreleased
+
+- [FEAT] `[@disable_order_of_hooks]` and `[@disable_exhaustive_deps]` on a `let` binding (`let[@disable_order_of_hooks] x = ...`) skip their checks for every hook call in that binding.
+- [FIX] A hook call after a JSX element in a sequence (`ignore <div />; React.useState ...`) is no longer reported as called conditionally.
+
 ## 1.3.0
 
 ### Exhaustive dependencies

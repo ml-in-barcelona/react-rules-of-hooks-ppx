@@ -16,9 +16,7 @@ let component_attributes =
   [ "react.component"; "react.client.component"; "react.async.component" ]
 
 let has_component_attribute attrs =
-  attrs
-  |> List.exists (fun { attr_name; _ } ->
-      List.mem attr_name.txt component_attributes)
+  List.exists (fun name -> Hook.has_attribute name attrs) component_attributes
 
 let classify (t : Parsetree.value_binding) =
   let is_function =
@@ -32,12 +30,15 @@ let classify (t : Parsetree.value_binding) =
   in
   if not is_function then Value
   else
-    let names = Bindings.of_pattern t.pvb_pat in
-    if
+    let marked_as_component =
       has_component_attribute t.pvb_attributes
       || has_component_attribute t.pvb_pat.ppat_attributes
-    then Component
-    else if List.exists Hook.is_hook_name names then Custom_hook
+    in
+    let named_like_hook =
+      List.exists Hook.is_hook_name (Bindings.of_pattern t.pvb_pat)
+    in
+    if marked_as_component then Component
+    else if named_like_hook then Custom_hook
     else Function
 
 let initial =
@@ -54,12 +55,11 @@ let stable_lookup scope name = StringMap.find_opt name scope.stable_hooks
 let enter_binding kind ~in_component_or_hook (t : Parsetree.value_binding) scope
     =
   let binding_names = Bindings.of_pattern t.pvb_pat in
+  let bound = StringSet.of_list binding_names in
   let scope =
     {
       scope with
-      browser_only_hooks =
-        StringSet.diff scope.browser_only_hooks
-          (StringSet.of_list binding_names);
+      browser_only_hooks = StringSet.diff scope.browser_only_hooks bound;
       stable_hooks =
         List.fold_left
           (fun map name -> StringMap.remove name map)
@@ -72,27 +72,20 @@ let enter_binding kind ~in_component_or_hook (t : Parsetree.value_binding) scope
     else if in_component_or_hook then
       {
         scope with
-        component_bindings =
-          StringSet.union scope.component_bindings
-            (StringSet.of_list binding_names);
+        component_bindings = StringSet.union scope.component_bindings bound;
       }
     else
-      {
-        scope with
-        outer_bindings =
-          StringSet.union scope.outer_bindings (StringSet.of_list binding_names);
-      }
+      { scope with outer_bindings = StringSet.union scope.outer_bindings bound }
   in
   let scope =
-    match Stable.static_deps_of_binding ~lookup:(stable_lookup scope) t with
-    | [] -> scope
-    | new_static_deps ->
-        {
-          scope with
-          static_deps =
-            StringSet.union scope.static_deps
-              (StringSet.of_list new_static_deps);
-        }
+    let new_static_deps =
+      Stable.static_deps_of_binding ~lookup:(stable_lookup scope) t
+    in
+    {
+      scope with
+      static_deps =
+        StringSet.union scope.static_deps (StringSet.of_list new_static_deps);
+    }
   in
   match Stable.wrapper_shape ~lookup:(stable_lookup scope) t with
   | Some (name, shape) ->

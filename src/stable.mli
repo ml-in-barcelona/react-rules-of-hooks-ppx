@@ -6,12 +6,6 @@ type shape =
           [useReducer]) *)
   | All  (** every name bound from the call is stable ([useRef]) *)
 
-val shape_of_call :
-  lookup:(string -> shape option) -> expression -> shape option
-(** The stability shape of a hook call expression: hardcoded for
-    [useState]/[useReducer]/[useRef] (bare or [React.]-prefixed), [lookup] for
-    locally-defined stable wrappers. *)
-
 val wrapper_shape :
   lookup:(string -> shape option) -> value_binding -> (string * shape) option
 (** [let useX = ...] whose fun-chain body is a stable hook call: a local hook

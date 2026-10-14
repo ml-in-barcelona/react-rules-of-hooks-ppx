@@ -36,8 +36,8 @@ wrote.
 | `-disable-exhaustive-deps` | turns off all exhaustive-deps checks |
 | `-disable-order-of-hooks` | turns off rules-of-hooks checks (scope tracking still runs, so exhaustive-deps is unaffected) |
 | `-corrections` | writes `.ppx-corrected` files with suggested dependency arrays |
-| `[@disable_exhaustive_deps]` | on a hook call or its deps argument: skips deps checks for that call |
-| `[@disable_order_of_hooks]` | on a hook call: skips order checks for that call |
+| `[@disable_exhaustive_deps]` | on a hook call or its deps argument: skips deps checks for that call; on a `let` binding: skips deps checks for every hook call in it |
+| `[@disable_order_of_hooks]` | on a hook call: skips order checks for that call; on a `let` binding: skips order checks for every hook call in it |
 | `REACT_HOOKS_PPX_TIMING=1` | prints per-file analysis timing to stderr |
 
 ## Module map
@@ -119,7 +119,10 @@ into:
   an error: the callback runs at effect time, not render time)
 
 A hook call in a conditional context, or inside JSX (an element body only
-renders when the element does), produces:
+renders when the element does), produces the error below. Each visited
+expression restores the context it entered with, so a JSX element does not
+mark the expressions after it: in `ignore <div />; useState ...` the hook is
+at the top level.
 
 ```
 Hooks can't be called conditionally and must be called at the top level of
