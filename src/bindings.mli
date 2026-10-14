@@ -4,8 +4,6 @@ val of_pattern : pattern -> string list
 (** Every name the pattern binds, through tuples, records, constructors,
     aliases, or-patterns, etc. *)
 
-val of_params : function_param list -> string list
-
 val function_params : expression -> string list
 (** All parameter names of a (possibly curried, constrained or
     platform-switched) function expression. *)

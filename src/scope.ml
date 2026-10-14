@@ -78,15 +78,14 @@ let enter_binding kind ~in_component_or_hook (t : Parsetree.value_binding) scope
       { scope with outer_bindings = StringSet.union scope.outer_bindings bound }
   in
   let scope =
-    match Stable.static_deps_of_binding ~lookup:(stable_lookup scope) t with
-    | [] -> scope
-    | new_static_deps ->
-        {
-          scope with
-          static_deps =
-            StringSet.union scope.static_deps
-              (StringSet.of_list new_static_deps);
-        }
+    let new_static_deps =
+      Stable.static_deps_of_binding ~lookup:(stable_lookup scope) t
+    in
+    {
+      scope with
+      static_deps =
+        StringSet.union scope.static_deps (StringSet.of_list new_static_deps);
+    }
   in
   match Stable.wrapper_shape ~lookup:(stable_lookup scope) t with
   | Some (name, shape) ->

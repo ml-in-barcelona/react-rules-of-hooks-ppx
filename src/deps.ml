@@ -3,7 +3,6 @@ open Ppxlib
 type path = { root : Longident.t; fields : string list }
 type t = { used_paths : path list; bound_names : string list }
 
-let path_of_ident root = { root; fields = [] }
 let root_name path = Longident.name path.root
 
 let is_qualified path =
@@ -49,7 +48,8 @@ let of_expression (expression : Parsetree.expression) : t =
   let add_path path (paths_rev, values_rev) = (path :: paths_rev, values_rev) in
   let rec collect (expression : Parsetree.expression) acc =
     match expression.pexp_desc with
-    | Pexp_ident { txt = ident; _ } -> add_path (path_of_ident ident) acc
+    | Pexp_ident { txt = ident; _ } ->
+        add_path { root = ident; fields = [] } acc
     | Pexp_let (_, value_bindings, expr) ->
         let acc =
           List.fold_left
