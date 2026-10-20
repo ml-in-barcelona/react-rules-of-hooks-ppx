@@ -44,13 +44,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v3
+      - name: Setup OCaml and dependencies
+        uses: ml-in-barcelona/gh-ci-action@v1.0.0
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          with-dev-setup: true
 
-      - name: Install dependencies
-        run: make install
+      - name: Load dune cache
+        uses: ml-in-barcelona/gh-ci-action/dune-cache/load@v1.0.0
 
       - name: Build
         run: make build
@@ -60,6 +61,10 @@ jobs:
 
       - name: Run tests
         run: make test
+
+      - name: Save dune cache
+        if: ${{ !cancelled() }}
+        uses: ml-in-barcelona/gh-ci-action/dune-cache/save@v1.0.0
 
       - name: Install dune-release
         if: startsWith(github.ref, 'refs/tags/') && matrix.os == 'ubuntu-latest' && matrix.ocaml-compiler == '5.4.0'
